@@ -1,5 +1,5 @@
 ﻿using PulsarModLoader;
-
+[assembly: System.Runtime.CompilerServices.IgnoresAccessChecksTo("Assembly-CSharp")]
 namespace CapBot
 {
     public class Mod : PulsarMod
