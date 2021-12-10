@@ -10,19 +10,31 @@ namespace CapBot
         static void Postfix(PLPlayer __instance)
         {
             if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0) return;
+            if (__instance.StartingShip != null && __instance.StartingShip.InWarp && PLServer.Instance.AllPlayersLoaded())
+                PLInGameUI.Instance.WarpSkipButtonClicked();
             if (__instance.StartingShip != null && __instance.StartingShip.MyStats.GetShipComponent<PLCaptainsChair>(ESlotType.E_COMP_CAPTAINS_CHAIR, false) != null)
             {
+                __instance.MyBot.AI_TargetPos = __instance.StartingShip.CaptainsChairPivot.position;
+                __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
                 if ((__instance.StartingShip.CaptainsChairPivot.position - __instance.GetPawn().transform.position).sqrMagnitude > 4)
                 {
-                    __instance.MyBot.AI_TargetPos = __instance.StartingShip.CaptainsChairPivot.position;
-                    __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
                     __instance.MyBot.EnablePathing = true;
                 }
-                else if (__instance.StartingShip.CaptainsChairPlayerID != __instance.GetPlayerID())
+                else
                 {
-                    __instance.StartingShip.AttemptToSitInCaptainsChair(__instance.GetPlayerID());
+                    if (__instance.StartingShip.CaptainsChairPlayerID != __instance.GetPlayerID())
+                    {
+                        __instance.StartingShip.AttemptToSitInCaptainsChair(__instance.GetPlayerID());
+                    }
                 }
 
+            }
+
+
+
+            if(__instance.MyBot.AI_TargetPos != __instance.StartingShip.CaptainsChairPivot.position && __instance.StartingShip.CaptainsChairPlayerID == __instance.GetPlayerID()) 
+            {
+                __instance.StartingShip.AttemptToSitInCaptainsChair(-1);
             }
         }
     }
@@ -55,6 +67,7 @@ namespace CapBot
             {
                 PLServer.Instance.ServerAddCrewBotPlayer(0);
                 PLServer.Instance.GameHasStarted = true;
+                PLServer.Instance.CrewPurchaseLimitsEnabled = false;
             }
             else if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null) delay += Time.deltaTime;
         }
