@@ -26,6 +26,10 @@ namespace CapBot
                 AtColony(__instance);
                 return;
             }
+            if(PLServer.Instance.m_ShipCourseGoals.Count == 0) 
+            {
+                SetNextDestiny();
+            }
             if (__instance.StartingShip != null && __instance.StartingShip.MyStats.GetShipComponent<PLCaptainsChair>(ESlotType.E_COMP_CAPTAINS_CHAIR, false) != null) //Sit in chair
             {
                 __instance.MyBot.AI_TargetPos = __instance.StartingShip.CaptainsChairPivot.position;
@@ -150,11 +154,17 @@ namespace CapBot
             {
                 AI.AI_TargetPos = PLLCChair.Instance.gameObject.transform.position;
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
-                if ((pawn.transform.position - AI.AI_TargetPos).sqrMagnitude < 8 && Time.time - LastDestiny > 60)
+                if ((pawn.transform.position - AI.AI_TargetPos).sqrMagnitude < 8)
                 {
-                    PLLCChair.Instance.SetPlayerIDInChair(CapBot.GetPlayerID());
-                    PLLCChair.Instance.Triggered = true;
-                    PLLCChair.Instance.Triggered_LevelTwo = true;
+                    PLLCChair.Instance.photonView.RPC("Trigger", PhotonTargets.All, new object[0]);
+                    if (Time.time - LastDestiny > 60) 
+                    {
+                        PLLCChair.Instance.photonView.RPC("SetPlayerIDInChair", PhotonTargets.All, new object[] 
+                        {
+                            CapBot.GetPlayerID()
+                        });
+                        PLLCChair.Instance.photonView.RPC("Trigger_LevelTwo", PhotonTargets.All, new object[0]);
+                    }
                 }
             }
             else if(PLLCChair.Instance != null && PLLCChair.Instance.Triggered_LevelTwo && PLLCChair.Instance.PlayerIDInChair == CapBot.GetPlayerID() && !PLLCChair.Instance.Triggered_LevelThree) //Step 7: Do the minigame
@@ -180,7 +190,7 @@ namespace CapBot
             }
             else if(PLLCChair.Instance != null && PLLCChair.Instance.Triggered_LevelThree && PLLCChair.Instance.PlayerIDInChair == CapBot.GetPlayerID()) //Step 8: You keep control over the infected for yourselfs
             {
-                PLLCChair.Instance.StartKeepItEnding();
+                PLLCChair.Instance.photonView.RPC("StartKeepItEnding", PhotonTargets.All, new object[0]);
                 PLLCChair.Instance.SetPlayerIDInChair(-1);
             }
             foreach (PLPickupObject item in Object.FindObjectsOfType(typeof(PLPickupObject)))
@@ -197,6 +207,11 @@ namespace CapBot
                     });
                 }
             }
+        }
+
+        static void SetNextDestiny() 
+        {
+            
         }
     }
 
