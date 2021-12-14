@@ -92,6 +92,347 @@ namespace CapBot
                 LastAction = Time.time;
                 return;
             }
+            if(PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3) && !PLServer.Instance.IsFragmentCollected(10)) 
+            {
+                PLRace race = (Object.FindObjectOfType(typeof(PLRaceStartScreen)) as PLRaceStartScreen).MyRace;
+                PLPickupComponent prize = Object.FindObjectOfType(typeof(PLPickupComponent)) as PLPickupComponent;
+                if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR && race != null) 
+                {
+                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 1) == 0) 
+                    {
+                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                        {
+                            if (teleport.name == "GarageBSO")
+                            {
+                                __instance.MyBot.AI_TargetTLI = teleport;
+                                break;
+                            }
+                        }
+                        if (!PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.HasActiveMissionWithID(43072) && PLServer.Instance.CurrentCrewCredits >= 1000) 
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(174, 4, -332);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                if(PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(43499)) 
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                    {
+                                    43499,
+                                    false
+                                    });
+                                }
+                                else if(!PLServer.Instance.HasActiveMissionWithID(43072) && PLServer.Instance.CurrentCrewCredits >= 1000) 
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                    {
+                                    43072,
+                                    false
+                                    });
+                                }
+                            }
+                        }
+                        else 
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(158, 4, -341);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                race.SetAsReadyToStart();
+                            }
+                        }
+                        LastAction = Time.time;
+                        return;
+                    }
+                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 1) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.GetMissionWithID(43499).Ended) || (PLServer.Instance.HasActiveMissionWithID(43072) && !PLServer.Instance.GetMissionWithID(43072).Ended))) 
+                    {
+                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                        {
+                            if (teleport.name == "GarageBSO")
+                            {
+                                __instance.MyBot.AI_TargetTLI = teleport;
+                                break;
+                            }
+                        }
+                        if ((PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.GetMissionWithID(43499).Ended) || (PLServer.Instance.HasActiveMissionWithID(43072) && !PLServer.Instance.GetMissionWithID(43072).Ended))
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(174, 4, -332);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                if (PLServer.Instance.HasActiveMissionWithID(43499))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                    {
+                                    43499
+                                    });
+                                    PLServer.Instance.CurrentCrewCredits += 15000;
+                                }
+                                else if (PLServer.Instance.HasActiveMissionWithID(43072))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                    {
+                                    43072
+                                    });
+                                    PLServer.Instance.CurrentCrewCredits += 3000;
+                                }
+                            }
+                        }
+                        else if (prize != null && !prize.PickedUp)
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(162, 6, -335);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                __instance.AttemptToPickupComponentAtID(prize.PickupID);
+                            }
+                        }
+                        LastAction = Time.time;
+                        return;
+                    }
+                }
+                else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 && race != null)
+                {
+                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 2) == 0)
+                    {
+                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                        {
+                            if (teleport.name == "GarageBSO")
+                            {
+                                __instance.MyBot.AI_TargetTLI = teleport;
+                                break;
+                            }
+                        }
+                        if (!PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.HasActiveMissionWithID(43938) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(123, -15, -345);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(43938))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                    {
+                                    43938,
+                                    false
+                                    });
+                                }
+                                else if (!PLServer.Instance.HasActiveMissionWithID(43932) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                    {
+                                    43932,
+                                    false
+                                    });
+                                }
+                            }
+                        }
+                        else
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(132, -15, -278);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                race.SetAsReadyToStart();
+                            }
+                        }
+                        LastAction = Time.time;
+                        return;
+                    }
+                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 2) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.GetMissionWithID(43932).Ended) || (PLServer.Instance.HasActiveMissionWithID(43938) && !PLServer.Instance.GetMissionWithID(43938).Ended)))
+                    {
+                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                        {
+                            if (teleport.name == "GarageBSO")
+                            {
+                                __instance.MyBot.AI_TargetTLI = teleport;
+                                break;
+                            }
+                        }
+                        if ((PLServer.Instance.HasActiveMissionWithID(43938) && !PLServer.Instance.GetMissionWithID(43938).Ended) || (PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.GetMissionWithID(43932).Ended))
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(123, -15, -345);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                if (PLServer.Instance.HasActiveMissionWithID(43932))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                    {
+                                    43932
+                                    });
+                                    PLServer.Instance.CurrentCrewCredits += 3000;
+                                }
+                                else if (PLServer.Instance.HasActiveMissionWithID(43938))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                    {
+                                    43938
+                                    });
+                                    PLServer.Instance.CurrentCrewCredits += 15000;
+                                }
+                            }
+                        }
+                        else if (prize != null && !prize.PickedUp)
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(129, -14, -270);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                __instance.AttemptToPickupComponentAtID(prize.PickupID);
+                            }
+                        }
+                        LastAction = Time.time;
+                        return;
+                    }
+                }
+                else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3 && race != null && (PLServer.Instance.RacesWonBitfield & 1) != 0 && (PLServer.Instance.RacesWonBitfield & 2) != 0)
+                {
+                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 3) == 0)
+                    {
+                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                        {
+                            if (teleport.name == "GarageBSO")
+                            {
+                                __instance.MyBot.AI_TargetTLI = teleport;
+                                break;
+                            }
+                        }
+                        if (!PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.HasActiveMissionWithID(44088) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(115, -7, -233);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(44088))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                    {
+                                    44088,
+                                    false
+                                    });
+                                }
+                                else if (!PLServer.Instance.HasActiveMissionWithID(44085) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                    {
+                                    44085,
+                                    false
+                                    });
+                                }
+                            }
+                        }
+                        else
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(106, -7, -234);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                race.SetAsReadyToStart();
+                            }
+                        }
+                        LastAction = Time.time;
+                        return;
+                    }
+                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 3) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended)))
+                    {
+                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                        {
+                            if (teleport.name == "GarageBSO")
+                            {
+                                __instance.MyBot.AI_TargetTLI = teleport;
+                                break;
+                            }
+                        }
+                        if ((PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended))
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(115, -7, -233);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                if (PLServer.Instance.HasActiveMissionWithID(44085))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                    {
+                                    44085
+                                    });
+                                    PLServer.Instance.CurrentCrewCredits += 15000;
+                                }
+                                else if (PLServer.Instance.HasActiveMissionWithID(44088))
+                                {
+                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                    {
+                                    44088
+                                    });
+                                    PLServer.Instance.CurrentCrewCredits += 30000;
+                                }
+                            }
+                        }
+                        else if (prize != null && !prize.PickedUp)
+                        {
+                            __instance.MyBot.AI_TargetPos = new Vector3(110, -6, -226);
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                            {
+                                __instance.MyBot.EnablePathing = true;
+                            }
+                            else
+                            {
+                                __instance.AttemptToPickupComponentAtID(prize.PickupID);
+                            }
+                        }
+                        LastAction = Time.time;
+                        return;
+                    }
+                }
+            }
             if (PLServer.Instance.m_ShipCourseGoals.Count == 0 || Time.time - LastMapUpdate > 15)
             {
                 //Updates the map destines
