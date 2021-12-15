@@ -2,7 +2,8 @@
 using HarmonyLib;
 using UnityEngine;
 using System.Collections.Generic;
-
+using System.Reflection.Emit;
+using System.Linq;
 namespace CapBot
 {
     [HarmonyPatch(typeof(PLPlayer), "UpdateAIPriorities")]
@@ -13,6 +14,10 @@ namespace CapBot
         static float LastBlindJump = 0;
         static void Postfix(PLPlayer __instance)
         {
+            //if(__instance.cachedAIData == null) 
+           // {
+            //    PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
+            //}
             if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0) return;
             if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2)
             {
@@ -92,7 +97,7 @@ namespace CapBot
                 LastAction = Time.time;
                 return;
             }
-            if(PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3) && !PLServer.Instance.IsFragmentCollected(10)) 
+            if(PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3)) 
             {
                 PLRace race = (Object.FindObjectOfType(typeof(PLRaceStartScreen)) as PLRaceStartScreen).MyRace;
                 PLPickupComponent prize = Object.FindObjectOfType(typeof(PLPickupComponent)) as PLPickupComponent;
@@ -322,7 +327,7 @@ namespace CapBot
                 }
                 else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3 && race != null && (PLServer.Instance.RacesWonBitfield & 1) != 0 && (PLServer.Instance.RacesWonBitfield & 2) != 0)
                 {
-                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 3) == 0)
+                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 4) == 0)
                     {
                         foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
                         {
@@ -377,7 +382,7 @@ namespace CapBot
                         LastAction = Time.time;
                         return;
                     }
-                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 3) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended)))
+                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 4) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended)))
                     {
                         foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
                         {
@@ -432,6 +437,33 @@ namespace CapBot
                         return;
                     }
                 }
+            }
+            if(PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.GREY_HUNTSMAN_HQ && PLServer.Instance.HasActiveMissionWithID(104869) && !PLServer.Instance.GetMissionWithID(104869).Ended && !PLServer.Instance.IsFragmentCollected(7)) 
+            {
+                __instance.MyBot.AI_TargetPos = new Vector3(217, 111, -108);
+                __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                {
+                    if (teleport.name == "PLGamePlanet")
+                    {
+                        __instance.MyBot.AI_TargetTLI = teleport;
+                        break;
+                    }
+                }
+                if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                {
+                    __instance.MyBot.EnablePathing = true;
+                }
+                else
+                {
+                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                    {
+                        104869
+                    });
+                    PLServer.Instance.CollectFragment(7);
+                }
+                LastAction = Time.time;
+                return;
             }
             if (PLServer.Instance.m_ShipCourseGoals.Count == 0 || Time.time - LastMapUpdate > 15)
             {
@@ -492,6 +524,8 @@ namespace CapBot
         }
 
         static float LastDestiny = Time.time;
+        static bool IsRandomDestiny = false;
+
         static void AtColony(PLPlayer CapBot)
         {
             PLBot AI = CapBot.MyBot;
@@ -676,7 +710,7 @@ namespace CapBot
                         }
                     }
                 }
-                if (PLEncounterManager.Instance.PlayerShip.MyStats.ThrustOutputMax > 25 && !PLServer.Instance.IsFragmentCollected(10) && PLServer.Instance.CurrentCrewLevel >= 4) //Add races to possible destinations
+                if (PLEncounterManager.Instance.PlayerShip.MyStats.ThrustOutputMax >= 0.35 && !PLServer.Instance.IsFragmentCollected(10) && PLServer.Instance.CurrentCrewLevel >= 4) //Add races to possible destinations
                 {
                     if ((PLServer.Instance.RacesWonBitfield & 1) == 0)
                     {
@@ -686,14 +720,18 @@ namespace CapBot
                     {
                         destines.Add(PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.RACING_SECTOR_2));
                     }
-                    if ((PLServer.Instance.RacesWonBitfield & 1) != 0 && (PLServer.Instance.RacesWonBitfield & 2) != 0)
+                    if ((PLServer.Instance.RacesWonBitfield & 1) != 0 && (PLServer.Instance.RacesWonBitfield & 2) != 0 && (PLServer.Instance.RacesWonBitfield & 4) == 0)
                     {
                         destines.Add(PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.RACING_SECTOR_3));
                     }
                 }
-                if (!PLServer.Instance.IsFragmentCollected(1) && (PLServer.Instance.CurrentCrewCredits >= 100000 || (PLServer.Instance.CurrentCrewCredits >= 50000 && PLServer.Instance.CurrentCrewLevel >= 5)))
+                if (!PLServer.Instance.IsFragmentCollected(1) && (PLServer.Instance.CurrentCrewCredits >= 100000 || (PLServer.Instance.CurrentCrewCredits >= 50000 && PLServer.Instance.CurrentCrewLevel >= 5))) //Add burrow to possible destinations
                 {
                     destines.Add(PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.DESERT_HUB));
+                }
+                if(PLServer.Instance.HasActiveMissionWithID(104869) && !PLServer.Instance.GetMissionWithID(104869).Ended) 
+                {
+                    destines.Add(PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.GREY_HUNTSMAN_HQ));
                 }
             }
             destines.RemoveAll((PLSectorInfo sector) => sector == PLServer.GetCurrentSector());
@@ -720,18 +758,36 @@ namespace CapBot
                 }
 
             }
-            if (nearestDestiny == null && PLServer.Instance.CurrentCrewLevel >= 4)
+            if (nearestDestiny != null) IsRandomDestiny = false;
+            if (nearestDestiny == null && PLServer.Instance.CurrentCrewLevel >= 4 && !IsRandomDestiny)
             {
                 List<PLSectorInfo> random = new List<PLSectorInfo>();
+                PLSectorInfo nearestPlanet = null;
                 foreach (PLSectorInfo plsectorInfo in PLGlobal.Instance.Galaxy.AllSectorInfos.Values) //finds near random sectors
                 {
-                    if ((plsectorInfo.Position - PLServer.GetCurrentSector().Position).magnitude <= PLEncounterManager.Instance.PlayerShip.MyStats.WarpRange && !plsectorInfo.Visited && plsectorInfo.MySPI.Faction != 4)
+                    if ((plsectorInfo.Position - PLServer.GetCurrentSector().Position).magnitude <= PLEncounterManager.Instance.PlayerShip.MyStats.WarpRange && !plsectorInfo.Visited && plsectorInfo.MySPI.Faction != 4 && plsectorInfo != PLServer.GetCurrentSector())
                     {
                         random.Add(plsectorInfo);
+                        if (plsectorInfo.MySPI.HasPlanet) 
+                        {
+                            if(nearestPlanet == null) 
+                            {
+                                nearestPlanet = plsectorInfo;
+                            }
+                            else if((plsectorInfo.Position - PLServer.GetCurrentSector().Position).magnitude < (nearestPlanet.Position - PLServer.GetCurrentSector().Position).magnitude) 
+                            {
+                                nearestPlanet = plsectorInfo;
+                            }
+                        }
                     }
                 }
                 if (random.Count == 0) return;
                 nearestDestiny = random[Random.Range(0, random.Count - 1)];
+                if(nearestPlanet != null) 
+                {
+                    nearestDestiny = nearestPlanet;
+                }
+                IsRandomDestiny = true;
             }
             else if (nearestDestiny == null) return;
             nearestWarpGatedist = 500;
@@ -743,6 +799,7 @@ namespace CapBot
                     {
                         nearestWarpGatedist = (plsectorInfo.Position - PLServer.GetCurrentSector().Position).magnitude;
                         nearestWarpGate = plsectorInfo;
+                        IsRandomDestiny = false;
                     }
                 }
             }
@@ -755,21 +812,41 @@ namespace CapBot
                     {
                         nearestWarpGatedist = (plsectorInfo.Position - nearestDestiny.Position).magnitude;
                         nearestWarpGatetoDest = plsectorInfo;
+                        IsRandomDestiny = false;
                     }
                 }
             }
-            if (PLGlobal.Instance.Galaxy.GetPathToSector(PLServer.GetCurrentSector(), nearestWarpGate).Count + 1 + PLGlobal.Instance.Galaxy.GetPathToSector(nearestDestiny, nearestWarpGatetoDest).Count < PLGlobal.Instance.Galaxy.GetPathToSector(PLServer.GetCurrentSector(), nearestDestiny).Count && nearestWarpGate != PLServer.GetCurrentSector() && nearestWarpGate.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID)
+            if (PLGlobal.Instance.Galaxy.GetPathToSector(PLServer.GetCurrentSector(), nearestWarpGate).Count + 1 + PLGlobal.Instance.Galaxy.GetPathToSector(nearestDestiny, nearestWarpGatetoDest).Count < PLGlobal.Instance.Galaxy.GetPathToSector(PLServer.GetCurrentSector(), nearestDestiny).Count)
             {
-                PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
+                PLWarpStation warpGate = null;
+                if (PLEncounterManager.Instance.PlayerShip.MyFlightAI.cachedWarpStationList.Count > 0)
                 {
+                    warpGate = PLEncounterManager.Instance.PlayerShip.MyFlightAI.cachedWarpStationList[0];
+                }
+                if (nearestWarpGate != PLServer.GetCurrentSector() && (nearestWarpGate.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID || !PLEncounterManager.Instance.PlayerShip.InWarp))
+                {
+                    PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
+                    {
                     nearestWarpGate.ID
-                });
-                PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
+                    });
+                }
+                else if(warpGate != null && warpGate.GetPriceForSectorID(nearestWarpGatetoDest.ID) <= PLServer.Instance.CurrentCrewCredits && !warpGate.IsAligned)
                 {
+                    warpGate.photonView.RPC("SetTargetedSectorID", PhotonTargets.All, new object[]
+                    {
+                        nearestWarpGatetoDest,
+                        true
+                    });
+                }
+                if (nearestDestiny != PLServer.GetCurrentSector() && (nearestDestiny.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID || !PLEncounterManager.Instance.PlayerShip.InWarp))
+                {
+                    PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
+                    {
                     nearestDestiny.ID
-                });
+                    });
+                }
             }
-            else if (nearestDestiny != PLServer.GetCurrentSector() && nearestDestiny.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID)
+            else if (nearestDestiny != PLServer.GetCurrentSector() && (nearestDestiny.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID || !PLEncounterManager.Instance.PlayerShip.InWarp))
             {
                 PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
                 {
@@ -814,6 +891,7 @@ namespace CapBot
                 PLServer.Instance.ServerAddCrewBotPlayer(0);
                 PLServer.Instance.GameHasStarted = true;
                 PLServer.Instance.CrewPurchaseLimitsEnabled = false;
+                PLGlobal.Instance.LoadedAIData = PLGlobal.Instance.GenerateDefaultPriorities();
             }
             else if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null) delay += Time.deltaTime;
         }
@@ -827,4 +905,5 @@ namespace CapBot
             SpawnBot.delay = 0f;
         }
     }
+
 }
