@@ -14,11 +14,7 @@ namespace CapBot
         static float LastBlindJump = 0;
         static void Postfix(PLPlayer __instance)
         {
-            //if(__instance.cachedAIData == null) 
-            // {
-            //    PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
-            //}
-            if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient) return;
+            if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient || __instance.StartingShip == null) return;
             if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2)
             {
                 __instance.RaceID = 2;
@@ -34,8 +30,72 @@ namespace CapBot
                 AtColony(__instance);
                 return;
             }
+            PLServer.Instance.SetCustomCaptainOrderText(0, "Use the WarpGate!", false);
+            PLServer.Instance.SetCustomCaptainOrderText(1, "Engage Repair Protocols!", false);
             if (__instance.StartingShip.CurrentRace != null) __instance.StartingShip.AutoTarget = false;
             else __instance.StartingShip.AutoTarget = true;
+            if (__instance.StartingShip.MyFlightAI.cachedRepairDepotList.Count > 0 && __instance.StartingShip.MyStats.HullCurrent / __instance.StartingShip.MyStats.HullMax < 0.99f)
+            {
+                PLServer.Instance.CaptainSetOrderID(9);
+                __instance.StartingShip.AlertLevel = 0;
+                PLRepairDepot repair = __instance.StartingShip.MyFlightAI.cachedRepairDepotList[0];
+                if (repair.TargetShip == __instance.StartingShip && !__instance.StartingShip.ShieldIsActive && Time.time - LastAction > 1f) 
+                {
+                    int ammount = 0;
+                    int price = 0;
+                    PLRepairDepot.GetAutoPurchaseInfo(__instance.StartingShip, out ammount, out price, 2);
+                    PLServer.Instance.ServerRepairHull(__instance.StartingShip.ShipID, ammount, price);
+                    repair.photonView.RPC("OnRepairTargetShip", PhotonTargets.All, new object[]
+                    {
+                        __instance.StartingShip.ShipID
+                    });
+                    LastAction = Time.time;
+                }
+            }
+            else if (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count > 0 && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned) 
+            {
+                PLServer.Instance.CaptainSetOrderID(8);
+                __instance.StartingShip.AlertLevel = 0;
+            }
+            else if(__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) 
+            {
+                PLServer.Instance.CaptainSetOrderID(4);
+                __instance.StartingShip.AlertLevel = 2;
+            }
+            else 
+            {
+                PLServer.Instance.CaptainSetOrderID(1);
+                __instance.StartingShip.AlertLevel = 0;
+            }
+            if(Time.time - __instance.StartingShip.LastTookDamageTime() < 10f && __instance.StartingShip.AlertLevel == 0) 
+            {
+                __instance.StartingShip.AlertLevel = 1;
+            }
+            if(__instance.StartingShip.CurrentHailTargetSelection != null) 
+            {
+                if(__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_StartPickupMission) 
+                {
+                    PLHailTarget_StartPickupMission mission = __instance.StartingShip.CurrentHailTargetSelection as PLHailTarget_StartPickupMission;
+                    if(mission.PickupMissionID != -1 && !PLServer.Instance.HasActiveMissionWithID(mission.PickupMissionID)) 
+                    {
+                        PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                        {
+                        mission.PickupMissionID,
+                        true
+                        });
+                        __instance.StartingShip.TargetHailTargetID = -1;
+                    }
+                }
+                if(__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_Ship && Time.time - LastAction > 3f) 
+                {
+                    PLHailTarget_Ship ship = __instance.StartingShip.CurrentHailTargetSelection as PLHailTarget_Ship;
+                    if (ship.Hostile()) 
+                    {
+                        __instance.StartingShip.OnHailChoiceSelected(0, true, false);
+                    }
+                    LastAction = Time.time;
+                }
+            }
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.DESERT_HUB && !PLServer.Instance.IsFragmentCollected(1))//In the burrow
             {
                 if (PLServer.Instance.CurrentCrewCredits >= 100000)
@@ -565,7 +625,7 @@ namespace CapBot
                 return;
             }
             __instance.CurrentlyInLiarsDiceGame = null;
-            if (__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip && (__instance.StartingShip.TargetShip as PLShipInfo) != null && __instance.StartingShip.TargetShip.TeamID > 0)
+            if (__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip && (__instance.StartingShip.TargetShip as PLShipInfo) != null && __instance.StartingShip.TargetShip.TeamID > 0 && !__instance.StartingShip.TargetShip.IsQuantumShieldActive)
             {
                 PLShipInfo targetEnemy = __instance.StartingShip.TargetShip as PLShipInfo;
                 int screensCaptured = 0;
@@ -834,9 +894,13 @@ namespace CapBot
             PLSectorInfo nearestWarpGate = null;
             PLSectorInfo nearestWarpGatetoDest = null;
             PLSectorInfo nearestDestiny = null;
-            if (PLEncounterManager.Instance.PlayerShip.GetCombatLevel() > 80 && PLServer.Instance.GetNumFragmentsCollected() >= 4 && PLServer.Instance.CurrentCrewLevel >= 10)
+            if (PLEncounterManager.Instance.PlayerShip.GetCombatLevel() > 80 && PLServer.Instance.GetNumFragmentsCollected() >= 4 && PLServer.Instance.CurrentCrewLevel >= 10 && PLEncounterManager.Instance.PlayerShip.ShipTypeID != EShipType.E_POLYTECH_SHIP)
             {
                 destines.Add(GWG);
+            }
+            else if(PLEncounterManager.Instance.PlayerShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && PLServer.Instance.PTCountdownArmed && (PLServer.Instance.PTCountdownTime <= 600 || PLEncounterManager.Instance.PlayerShip.GetCombatLevel() >= 80)) 
+            {
+                destines.Add(PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.PT_WARP_GATE));
             }
             else
             {
@@ -988,7 +1052,7 @@ namespace CapBot
                     nearestWarpGate.ID
                     });
                 }
-                else if (warpGate != null && warpGate.GetPriceForSectorID(nearestWarpGatetoDest.ID) <= PLServer.Instance.CurrentCrewCredits && !warpGate.IsAligned && Time.time - LastWarpGateUse > 10 && PLServer.GetCurrentSector() != nearestWarpGatetoDest)
+                else if (warpGate != null && warpGate.GetPriceForSectorID(nearestWarpGatetoDest.ID) <= PLServer.Instance.CurrentCrewCredits && !warpGate.IsAligned && Time.time - LastWarpGateUse > 10 && PLServer.GetCurrentSector() != nearestWarpGatetoDest && !PLEncounterManager.Instance.PlayerShip.InWarp)
                 {
                     warpGate.photonView.RPC("SetTargetedSectorID", PhotonTargets.All, new object[]
                     {
