@@ -12,6 +12,7 @@ namespace CapBot
         static float LastAction = 0;
         static float LastMapUpdate = Time.time;
         static float LastBlindJump = 0;
+        static float WeaponsTest = Time.time;
         static void Postfix(PLPlayer __instance)
         {
             if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient || __instance.StartingShip == null) return;
@@ -95,6 +96,34 @@ namespace CapBot
                     }
                     LastAction = Time.time;
                 }
+            }
+            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WD_MISSIONCHAIN_WEAPONS_DEMO && !PLServer.Instance.HasCompletedMissionWithID(59682)) 
+            {
+                __instance.MyBot.AI_TargetPos = new Vector3(165, -124, -64);
+                __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                PLBurrowArena arena = Object.FindObjectOfType<PLBurrowArena>();
+                foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                {
+                    if (teleport.name == "PLGamePlanet")
+                    {
+                        __instance.MyBot.AI_TargetTLI = teleport;
+                        break;
+                    }
+                }
+                if (arena.ArenaIsActive) WeaponsTest = Time.time;
+                __instance.MyBot.EnablePathing = true;
+                if (!arena.ArenaIsActive && Time.time - WeaponsTest > 90)
+                {
+                    arena.StartArena_NoCredits(0);
+                    PLServer.Instance.GetMissionWithID(59682).Objectives[1].AmountCompleted = 1;
+                    WeaponsTest = Time.time;
+                }
+                if (__instance.GetPawn().SpawnedInArena) 
+                {
+                    __instance.MyBot.AI_TargetPos = new Vector3(126, -139, -27);
+                    __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                }
+                return;
             }
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.DESERT_HUB && !PLServer.Instance.IsFragmentCollected(1))//In the burrow
             {
