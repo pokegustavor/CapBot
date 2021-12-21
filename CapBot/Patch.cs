@@ -700,7 +700,7 @@ namespace CapBot
                     return;
                 }
             }
-            if ((PLServer.Instance.m_ShipCourseGoals.Count == 0 || Time.time - LastMapUpdate > 15) && (!IsRandomDestiny || (PLServer.Instance.m_ShipCourseGoals.Count > 0 && PLServer.Instance.m_ShipCourseGoals[0] == PLServer.GetCurrentSector().ID)))
+            if ((PLServer.Instance.m_ShipCourseGoals.Count == 0 || Time.time - LastMapUpdate > 15) && (!IsRandomDestiny || (PLServer.Instance.m_ShipCourseGoals.Count > 0 && (PLServer.Instance.m_ShipCourseGoals[0] == PLServer.GetCurrentSector().ID || (PLGlobal.Instance.Galaxy.AllSectorInfos[PLServer.Instance.m_ShipCourseGoals[0]].Position - PLServer.GetCurrentSector().Position).magnitude > __instance.StartingShip.MyStats.WarpRange))))
             {
                 //Updates the map destines
                 if (PLServer.Instance.m_ShipCourseGoals.Count == 0) IsRandomDestiny = false;
@@ -1081,7 +1081,7 @@ namespace CapBot
                     nearestWarpGate.ID
                     });
                 }
-                else if (warpGate != null && warpGate.GetPriceForSectorID(nearestWarpGatetoDest.ID) <= PLServer.Instance.CurrentCrewCredits && !warpGate.IsAligned && Time.time - LastWarpGateUse > 10 && PLServer.GetCurrentSector() != nearestWarpGatetoDest && !PLEncounterManager.Instance.PlayerShip.InWarp)
+                else if (warpGate != null && warpGate.GetPriceForSectorID(nearestWarpGatetoDest.ID) <= PLServer.Instance.CurrentCrewCredits && !warpGate.IsAligned && Time.time - LastWarpGateUse > 30 && PLServer.GetCurrentSector() != nearestWarpGatetoDest && !PLEncounterManager.Instance.PlayerShip.InWarp)
                 {
                     warpGate.photonView.RPC("SetTargetedSectorID", PhotonTargets.All, new object[]
                     {
@@ -1090,6 +1090,7 @@ namespace CapBot
                     });
                     LastWarpGateUse = Time.time;
                 }
+                if (warpGate.IsAligned) LastWarpGateUse = Time.time;
                 if (nearestDestiny != PLServer.GetCurrentSector() && (nearestDestiny.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID || !PLEncounterManager.Instance.PlayerShip.InWarp))
                 {
                     PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
