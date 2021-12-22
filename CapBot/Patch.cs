@@ -939,7 +939,7 @@ namespace CapBot
                     {
                         foreach (PLSectorInfo plsectorInfo in PLGlobal.Instance.Galaxy.AllSectorInfos.Values)
                         {
-                            if (plsectorInfo.MissionSpecificID == mission.MissionTypeID && plsectorInfo != GWG && !plsectorInfo.Visited)
+                            if (plsectorInfo.MissionSpecificID == mission.MissionTypeID && plsectorInfo != GWG && !plsectorInfo.Visited && PLStarmap.ShouldShowSector(plsectorInfo))
                             {
                                 destines.Add(plsectorInfo);
                                 break;
@@ -1017,7 +1017,7 @@ namespace CapBot
                 PLSectorInfo nearestPlanet = null;
                 foreach (PLSectorInfo plsectorInfo in PLGlobal.Instance.Galaxy.AllSectorInfos.Values) //finds near random sectors
                 {
-                    if ((plsectorInfo.Position - PLServer.GetCurrentSector().Position).magnitude <= PLEncounterManager.Instance.PlayerShip.MyStats.WarpRange && !plsectorInfo.Visited && plsectorInfo.MySPI.Faction != 4 && plsectorInfo != PLServer.GetCurrentSector())
+                    if ((plsectorInfo.Position - PLServer.GetCurrentSector().Position).magnitude <= PLEncounterManager.Instance.PlayerShip.MyStats.WarpRange && !plsectorInfo.Visited && plsectorInfo.MySPI.Faction != 4 && plsectorInfo != PLServer.GetCurrentSector() && PLStarmap.ShouldShowSector(plsectorInfo))
                     {
                         random.Add(plsectorInfo);
                         PLPersistantEncounterInstance plpersistantEncounterInstance = PLEncounterManager.Instance.CreatePersistantEncounterInstanceOfID(plsectorInfo.ID, false);
@@ -1090,7 +1090,7 @@ namespace CapBot
                     });
                     LastWarpGateUse = Time.time;
                 }
-                if (warpGate.IsAligned) LastWarpGateUse = Time.time;
+                if (warpGate != null && warpGate.IsAligned) LastWarpGateUse = Time.time;
                 if (nearestDestiny != PLServer.GetCurrentSector() && (nearestDestiny.ID != PLEncounterManager.Instance.PlayerShip.WarpTargetID || !PLEncounterManager.Instance.PlayerShip.InWarp))
                 {
                     PLServer.Instance.photonView.RPC("AddCourseGoal", PhotonTargets.All, new object[]
