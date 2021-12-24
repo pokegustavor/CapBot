@@ -46,6 +46,10 @@
     <Reference Include="AstarPathfindingProject">
       <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PULSARLostColony\PULSAR_LostColony_Data\Managed\AstarPathfindingProject.dll</HintPath>
     </Reference>
+    <Reference Include="Behave.Unity.Runtime, Version=0.0.0.0, Culture=neutral, PublicKeyToken=e615ca22040f207c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PULSARLostColony\PULSAR_LostColony_Data\Managed\Behave.Unity.Runtime.dll</HintPath>
+    </Reference>
     <Reference Include="CrewAILibraryBuild">
       <HintPath>..\..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\PULSARLostColony\PULSAR_LostColony_Data\Managed\CrewAILibraryBuild.dll</HintPath>
     </Reference>

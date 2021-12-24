@@ -15,20 +15,30 @@ namespace CapBot
         static float WeaponsTest = Time.time;
         static void Postfix(PLPlayer __instance)
         {
+            if ((__instance.cachedAIData == null || (__instance.cachedAIData.Priorities.Count == 0)) && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot)
+            {
+                __instance.cachedAIData = new AIDataIndividual();
+                PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
+            }
             if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient || __instance.StartingShip == null) return;
             if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2)
             {
                 __instance.RaceID = 2;
             }
-            if (__instance.StartingShip != null && __instance.StartingShip.InWarp && PLServer.Instance.AllPlayersLoaded()) //Skip warp
+            if (__instance.StartingShip != null && __instance.StartingShip.InWarp && PLServer.Instance.AllPlayersLoaded() && (__instance.StartingShip.MyShieldGenerator == null || __instance.StartingShip.MyStats.ShieldsCurrent / __instance.StartingShip.MyStats.ShieldsMax > 0.99)) //Skip warp
                 PLInGameUI.Instance.WarpSkipButtonClicked();
-            if (__instance.MyBot.AI_TargetPos != __instance.StartingShip.CaptainsChairPivot.position && __instance.StartingShip.CaptainsChairPlayerID == __instance.GetPlayerID())// leave chair
+            if (__instance.MyBot.AI_TargetPos != __instance.StartingShip.CaptainsChairPivot.position && __instance.StartingShip.CaptainsChairPlayerID == __instance.GetPlayerID())//leave chair
             {
                 __instance.StartingShip.AttemptToSitInCaptainsChair(-1);
             }
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.TOPSEC)//Inside the colony 
             {
                 AtColony(__instance);
+                return;
+            }
+            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.LCWBATTLE)//In the warp guardian battle 
+            {
+                WarpGuardianBattle(__instance);
                 return;
             }
             PLServer.Instance.SetCustomCaptainOrderText(0, "Use the WarpGate!", false);
@@ -58,7 +68,7 @@ namespace CapBot
                 PLServer.Instance.CaptainSetOrderID(8);
                 __instance.StartingShip.AlertLevel = 0;
             }
-            else if(__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) 
+            else if((__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) || __instance.StartingShip.TargetSpaceTarget != null) 
             {
                 PLServer.Instance.CaptainSetOrderID(4);
                 __instance.StartingShip.AlertLevel = 2;
@@ -122,6 +132,9 @@ namespace CapBot
                 {
                     __instance.MyBot.AI_TargetPos = new Vector3(126, -139, -27);
                     __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                    __instance.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
+                    __instance.MyBot.TickFindInvaderAction(null);
+                    
                 }
                 return;
             }
@@ -182,6 +195,11 @@ namespace CapBot
                         {
                             arena.StartArena(0);
                             __instance.GetPawn().transform.position = new Vector3(103, 4, -115);
+                        }
+                        else if(arena.ArenaIsActive && __instance.GetPawn().SpawnedInArena) 
+                        {
+                            __instance.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
+                            __instance.MyBot.TickFindInvaderAction(null);
                         }
                     }
                 }
@@ -913,7 +931,67 @@ namespace CapBot
                 }
             }
         }
+        static void WarpGuardianBattle(PLPlayer CapBot) 
+        {
+            if (PLWarpGuardian.Instance == null) return;
+            if(PLWarpGuardian.Instance.GetCurrentPhase() == 1) 
+            {
+                if (!PLWarpGuardian.Instance.BottomArmor.Destroyed) 
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.BottomArmor;
+                }
+                else if (!PLWarpGuardian.Instance.Core.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.Core;
+                }
+                else if (!PLWarpGuardian.Instance.HeadBeamWeapon.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.HeadBeamWeapon;
+                }
+                else if (!PLWarpGuardian.Instance.SideEnergyProjWeapon.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.SideEnergyProjWeapon;
+                }
+            }
+            else 
+            {
+                if (!PLWarpGuardian.Instance.BoardingSystem.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.BoardingSystem;
+                }
+                else if (!PLWarpGuardian.Instance.SideCannonModule.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.SideCannonModule;
+                }
+                else if (!PLWarpGuardian.Instance.BottomArmor.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.BottomArmor;
+                }
+                else if (!PLWarpGuardian.Instance.Core.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.Core;
+                }
+                else if (!PLWarpGuardian.Instance.HeadBeamWeapon.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.HeadBeamWeapon;
+                }
+                else if (!PLWarpGuardian.Instance.SideEnergyProjWeapon.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.SideEnergyProjWeapon;
+                }
+                else if (!PLWarpGuardian.Instance.BoostModule.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.BoostModule;
+                }
+                else if (!PLWarpGuardian.Instance.ModuleRepairModule.Destroyed)
+                {
+                    PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.ModuleRepairModule;
+                }
+                CapBot.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
+                //CapBot.MyBot.TickFindInvaderAction(null);
+            }
 
+        }
         static void SetNextDestiny()
         {
             if (PLEncounterManager.Instance.PlayerShip == null) return;
@@ -996,7 +1074,7 @@ namespace CapBot
                 }
             }
             nearestWarpGatedist = 500;
-            if (PLEncounterManager.Instance.PlayerShip.MyStats.HullCurrent / PLEncounterManager.Instance.PlayerShip.MyStats.HullMax < 0.6)
+            if (PLEncounterManager.Instance.PlayerShip.MyStats.HullCurrent / PLEncounterManager.Instance.PlayerShip.MyStats.HullMax < 0.6 || PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules <= 10 || PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent <= 0.25)
             {
                 foreach (PLSectorInfo sector in PLGlobal.Instance.Galaxy.AllSectorInfos.Values) //finds nearest repair depot
                 {
@@ -1136,26 +1214,50 @@ namespace CapBot
     [HarmonyPatch(typeof(PLUIClassSelectionMenu), "Update")]
     class SpawnBot
     {
+        public static bool capisbot = false;
         public static float delay = 0f;
         static void Postfix()
         {
-            if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null && delay > 3f)
+            if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null && delay > 3f && PhotonNetwork.isMasterClient)
             {
                 PLServer.Instance.ServerAddCrewBotPlayer(0);
                 PLServer.Instance.GameHasStarted = true;
                 PLServer.Instance.CrewPurchaseLimitsEnabled = false;
                 PLGlobal.Instance.LoadedAIData = PLGlobal.Instance.GenerateDefaultPriorities();
+                capisbot = true;
             }
-            else if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null) delay += Time.deltaTime;
+            else if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null && PhotonNetwork.isMasterClient) delay += Time.deltaTime;
         }
     }
-
+    [HarmonyPatch(typeof(PLPlayer), "GetAIData")]
+    class CapbotReciveAI
+    {
+        /*
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> Instructions)
+        {
+            List<CodeInstruction> instructionsList = Instructions.ToList();
+            instructionsList[10].opcode = OpCodes.Ldc_I4_M1;
+            return instructionsList.AsEnumerable();
+        }
+        */
+        static void Postfix(PLPlayer __instance, ref AIDataIndividual __result) 
+        {
+            if(__instance.cachedAIData == null && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot) 
+            {
+                __instance.cachedAIData = new AIDataIndividual();
+                PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
+            }
+            __result = __instance.cachedAIData;
+        }
+    }
+    
     [HarmonyPatch(typeof(PLGlobal), "EnterNewGame")]
     class OnJoin
     {
         static void Postfix()
         {
             SpawnBot.delay = 0f;
+            SpawnBot.capisbot = false;
         }
     }
 
