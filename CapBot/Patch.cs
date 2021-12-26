@@ -17,6 +17,8 @@ namespace CapBot
         {
             if ((__instance.cachedAIData == null || (__instance.cachedAIData.Priorities.Count == 0)) && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot)
             {
+                if (__instance.cachedAIData == null) PulsarModLoader.Utilities.Messaging.Notification("Null value!");
+                if (__instance.cachedAIData != null) PulsarModLoader.Utilities.Messaging.Notification("Priorities value: " + __instance.cachedAIData.Priorities.Count);
                 __instance.cachedAIData = new AIDataIndividual();
                 PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
             }
@@ -41,8 +43,64 @@ namespace CapBot
                 WarpGuardianBattle(__instance);
                 return;
             }
+            PLSectorInfo sector = PLServer.GetCurrentSector();
+            if (sector.VisualIndication == ESectorVisualIndication.GENERAL_STORE || sector.VisualIndication == ESectorVisualIndication.EXOTIC1 || sector.VisualIndication == ESectorVisualIndication.EXOTIC2 || sector.VisualIndication == ESectorVisualIndication.EXOTIC3 || sector.VisualIndication == ESectorVisualIndication.EXOTIC4
+                        || sector.VisualIndication == ESectorVisualIndication.EXOTIC5 || sector.VisualIndication == ESectorVisualIndication.EXOTIC6 || sector.VisualIndication == ESectorVisualIndication.EXOTIC7 || sector.VisualIndication == ESectorVisualIndication.AOG_HUB || sector.VisualIndication == ESectorVisualIndication.GENTLEMEN_START || sector.VisualIndication == ESectorVisualIndication.CORNELIA_HUB
+                        || sector.VisualIndication == ESectorVisualIndication.COLONIAL_HUB || sector.VisualIndication == ESectorVisualIndication.WD_START || sector.VisualIndication == ESectorVisualIndication.SPACE_SCRAPYARD || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_01 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_02 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_03 || sector.VisualIndication == ESectorVisualIndication.SPACE_CAVE_2) 
+            {
+             //In a sector with a store
+                if(PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules <= 15) 
+                {
+                    int numoffuels = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetFuelBasePrice() * ShopRepMultiplier()) /2;
+                    numoffuels = Mathf.Min(numoffuels, 200 - PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules);
+                    for(int i = 0; i < numoffuels; i++) 
+                    {
+                        PLServer.Instance.photonView.RPC("CaptainBuy_Fuel", PhotonTargets.All, new object[]
+                        {
+                         PLEncounterManager.Instance.PlayerShip.ShipID,
+                         PLServer.Instance.GetFuelBasePrice()* ShopRepMultiplier()
+                        });
+                    }
+                }
+                if(PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent < 0.9f) 
+                {
+                    int numofcoolant = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetCoolantBasePrice() * ShopRepMultiplier());
+                    numofcoolant = Mathf.Min(numofcoolant, (int)((1 - PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent) * 8));
+                    for (int i = 0; i < numofcoolant; i++)
+                    {
+                        PLServer.Instance.photonView.RPC("CaptainBuy_Coolant", PhotonTargets.All, new object[]
+                        {
+                         PLEncounterManager.Instance.PlayerShip.ShipID,
+                         PLServer.Instance.GetCoolantBasePrice() * ShopRepMultiplier()
+                        });
+                    }
+                    
+                }
+                foreach(PLShipComponent component in PLEncounterManager.Instance.PlayerShip.MyStats.AllComponents) 
+                {
+                    if (component is PLTrackerMissile)
+                    {
+                        PLTrackerMissile missile = component as PLTrackerMissile;
+                        if (missile.SubTypeData < missile.AmmoCapacity && missile.IsEquipped)
+                        {
+                            if ((missile.AmmoCapacity - missile.SubTypeData) * missile.MissileRefillPrice * ShopRepMultiplier() < PLServer.Instance.CurrentCrewCredits)
+                            {
+                                PLServer.Instance.photonView.RPC("CaptainBuy_MissileRefill", PhotonTargets.All, new object[]
+                                {
+                                PLEncounterManager.Instance.PlayerShip.ShipID,
+                                missile.NetID,
+                                missile.AmmoCapacity - missile.SubTypeData,
+                                (int)((missile.AmmoCapacity - missile.SubTypeData) * missile.MissileRefillPrice * ShopRepMultiplier())
+                                });
+                            }
+
+                        }
+                    }
+                }
+            }
             PLServer.Instance.SetCustomCaptainOrderText(0, "Use the WarpGate!", false);
             PLServer.Instance.SetCustomCaptainOrderText(1, "Engage Repair Protocols!", false);
+            PLServer.Instance.SetCustomCaptainOrderText(2, "Align the ship!", false);
             if (__instance.StartingShip.CurrentRace != null) __instance.StartingShip.AutoTarget = false;
             else __instance.StartingShip.AutoTarget = true;
             if (__instance.StartingShip.MyFlightAI.cachedRepairDepotList.Count > 0 && __instance.StartingShip.MyStats.HullCurrent / __instance.StartingShip.MyStats.HullMax < 0.99f)
@@ -773,6 +831,27 @@ namespace CapBot
                 LastAction = Time.time;
             }
         }
+        static float ShopRepMultiplier()
+        {
+            float num = 1f;
+            if (PLServer.GetCurrentSector() != null)
+            {
+                int faction = PLServer.GetCurrentSector().MySPI.Faction;
+                if (faction != -1)
+                {
+                    bool flag = true;
+                    if (faction == 1 && PLServer.GetCurrentSector().VisualIndication != ESectorVisualIndication.AOG_HUB)
+                    {
+                        flag = false;
+                    }
+                    if (flag)
+                    {
+                        num -= 0.05f * (float)PLServer.Instance.RepLevels[faction];
+                    }
+                }
+            }
+            return Mathf.Clamp(num, 0.5f, 2f);
+        }
 
         static float LastDestiny = Time.time;
         static bool IsRandomDestiny = false;
@@ -1227,6 +1306,7 @@ namespace CapBot
                 capisbot = true;
             }
             else if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null && PhotonNetwork.isMasterClient) delay += Time.deltaTime;
+            else delay = 0;
         }
     }
     [HarmonyPatch(typeof(PLPlayer), "GetAIData")]
