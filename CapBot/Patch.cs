@@ -15,15 +15,16 @@ namespace CapBot
         static float WeaponsTest = Time.time;
         static void Postfix(PLPlayer __instance)
         {
-            if ((__instance.cachedAIData == null || (__instance.cachedAIData.Priorities.Count == 0)) && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot)
+            if ((__instance.cachedAIData == null || __instance.cachedAIData.Priorities.Count == 0) && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot) //Give default AI priorities
             {
                 if (__instance.cachedAIData == null) PulsarModLoader.Utilities.Messaging.Notification("Null value!");
                 if (__instance.cachedAIData != null) PulsarModLoader.Utilities.Messaging.Notification("Priorities value: " + __instance.cachedAIData.Priorities.Count);
-                __instance.cachedAIData = new AIDataIndividual();
+                PulsarModLoader.Utilities.Messaging.Notification("Name: " + __instance.cachedAIData.Priorities.Count);
+                if (__instance.cachedAIData == null) __instance.cachedAIData = new AIDataIndividual();
                 PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
             }
             if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient || __instance.StartingShip == null) return;
-            if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2)
+            if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2) //set race to robot in paladin
             {
                 __instance.RaceID = 2;
             }
@@ -46,23 +47,23 @@ namespace CapBot
             PLSectorInfo sector = PLServer.GetCurrentSector();
             if (sector.VisualIndication == ESectorVisualIndication.GENERAL_STORE || sector.VisualIndication == ESectorVisualIndication.EXOTIC1 || sector.VisualIndication == ESectorVisualIndication.EXOTIC2 || sector.VisualIndication == ESectorVisualIndication.EXOTIC3 || sector.VisualIndication == ESectorVisualIndication.EXOTIC4
                         || sector.VisualIndication == ESectorVisualIndication.EXOTIC5 || sector.VisualIndication == ESectorVisualIndication.EXOTIC6 || sector.VisualIndication == ESectorVisualIndication.EXOTIC7 || sector.VisualIndication == ESectorVisualIndication.AOG_HUB || sector.VisualIndication == ESectorVisualIndication.GENTLEMEN_START || sector.VisualIndication == ESectorVisualIndication.CORNELIA_HUB
-                        || sector.VisualIndication == ESectorVisualIndication.COLONIAL_HUB || sector.VisualIndication == ESectorVisualIndication.WD_START || sector.VisualIndication == ESectorVisualIndication.SPACE_SCRAPYARD || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_01 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_02 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_03 || sector.VisualIndication == ESectorVisualIndication.SPACE_CAVE_2) 
+                        || sector.VisualIndication == ESectorVisualIndication.COLONIAL_HUB || sector.VisualIndication == ESectorVisualIndication.WD_START || sector.VisualIndication == ESectorVisualIndication.SPACE_SCRAPYARD || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_01 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_02 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_03 || sector.VisualIndication == ESectorVisualIndication.SPACE_CAVE_2)
             {
-             //In a sector with a store
-                if(PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules <= 15) 
+                //In a sector with a store
+                if (PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules <= 15)
                 {
-                    int numoffuels = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetFuelBasePrice() * ShopRepMultiplier()) /2;
+                    int numoffuels = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetFuelBasePrice() * ShopRepMultiplier()) / 2;
                     numoffuels = Mathf.Min(numoffuels, 200 - PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules);
-                    for(int i = 0; i < numoffuels; i++) 
+                    for (int i = 0; i < numoffuels; i++)
                     {
                         PLServer.Instance.photonView.RPC("CaptainBuy_Fuel", PhotonTargets.All, new object[]
                         {
                          PLEncounterManager.Instance.PlayerShip.ShipID,
-                         PLServer.Instance.GetFuelBasePrice()* ShopRepMultiplier()
+                         (int)(PLServer.Instance.GetFuelBasePrice()* ShopRepMultiplier())
                         });
                     }
                 }
-                if(PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent < 0.9f) 
+                if (PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent < 0.9f)
                 {
                     int numofcoolant = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetCoolantBasePrice() * ShopRepMultiplier());
                     numofcoolant = Mathf.Min(numofcoolant, (int)((1 - PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent) * 8));
@@ -74,9 +75,9 @@ namespace CapBot
                          PLServer.Instance.GetCoolantBasePrice() * ShopRepMultiplier()
                         });
                     }
-                    
+
                 }
-                foreach(PLShipComponent component in PLEncounterManager.Instance.PlayerShip.MyStats.AllComponents) 
+                foreach (PLShipComponent component in PLEncounterManager.Instance.PlayerShip.MyStats.AllComponents)
                 {
                     if (component is PLTrackerMissile)
                     {
@@ -101,14 +102,136 @@ namespace CapBot
             PLServer.Instance.SetCustomCaptainOrderText(0, "Use the WarpGate!", false);
             PLServer.Instance.SetCustomCaptainOrderText(1, "Engage Repair Protocols!", false);
             PLServer.Instance.SetCustomCaptainOrderText(2, "Align the ship!", false);
+            PLServer.Instance.SetCustomCaptainOrderText(3, "Collect Missions!", false);
+            if (PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.COLONIAL_HUB || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WD_START || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.AOG_HUB || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.CORNELIA_HUB || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.CYPHER_LAB || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_01))
+            {
+                List<PLDialogueActorInstance> allNPC = new List<PLDialogueActorInstance>();
+                foreach (PLDialogueActorInstance pLDialogueActorInstance in Object.FindObjectsOfType<PLDialogueActorInstance>()) //Finds all NPCs that have mission (with exception of Explorer's appeal)
+                {
+                    if (pLDialogueActorInstance.AllAvailableChoices().Count <= 0 && pLDialogueActorInstance.CurrentLine == null && pLDialogueActorInstance.ActorTypeData != null)
+                    {
+                        if (pLDialogueActorInstance.ActorTypeData.OpeningLines.Count > 0)
+                        {
+                            foreach (LineData lineData in pLDialogueActorInstance.ActorTypeData.OpeningLines)
+                            {
+                                if (lineData != null && lineData.PassesRequirements(pLDialogueActorInstance, null, null))
+                                {
+                                    pLDialogueActorInstance.CurrentLine = lineData;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if ((pLDialogueActorInstance.HasMissionStartAvailable && pLDialogueActorInstance.DisplayName == "Eldon Gatra") || (pLDialogueActorInstance.DisplayName == "Commander Darine Hatham" && (!PLServer.Instance.HasActiveMissionWithID(48632))) || pLDialogueActorInstance.DisplayName.ToLower().Contains("baris") 
+                        || pLDialogueActorInstance.DisplayName.ToLower().Contains("zeng") || (pLDialogueActorInstance.HasMissionStartAvailable && pLDialogueActorInstance.DisplayName.ToLower().Contains("zesho")) || pLDialogueActorInstance.DisplayName.ToLower().Contains("eikeni")) continue;
+                    if (!pLDialogueActorInstance.ShipDialogue && (pLDialogueActorInstance.HasMissionStartAvailable && pLDialogueActorInstance.AllAvailableChoices().Count > 0) || pLDialogueActorInstance.HasMissionEndAvailable)
+                    {
+                        allNPC.Add(pLDialogueActorInstance);
+                    }
+                }
+                if (allNPC.Count > 0) //if there is at least 1 mission to gather or deliver
+                {
+                    if (PLServer.Instance.CaptainsOrdersID != 11)
+                    {
+                        PLServer.Instance.CaptainSetOrderID(11);
+                    }
+                    float NearestNPCDistance = (allNPC[0].gameObject.transform.position - __instance.GetPawn().transform.position).magnitude;
+                    __instance.MyBot.AI_TargetPos = allNPC[0].gameObject.transform.position;
+                    __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                    PLDialogueActorInstance targetNPC = allNPC[0];
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "PLGamePlanet" || teleport.name == "PL_GamePlanet" || teleport.name == "PLGame")
+                        {
+                            __instance.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    foreach (PLDialogueActorInstance pLDialogueActorInstance in allNPC)
+                    {
+                        if ((pLDialogueActorInstance.gameObject.transform.position - __instance.GetPawn().transform.position).magnitude < NearestNPCDistance)
+                        {
+                            NearestNPCDistance = (pLDialogueActorInstance.gameObject.transform.position - __instance.GetPawn().transform.position).magnitude;
+                            __instance.MyBot.AI_TargetPos = pLDialogueActorInstance.gameObject.transform.position;
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            targetNPC = pLDialogueActorInstance;
+                        }
+                    }
+                    if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 8)
+                    {
+                        __instance.MyBot.EnablePathing = true;
+                    }
+                    else if (targetNPC.HasMissionStartAvailable)
+                    {
+                        LineData currentDiologue = targetNPC.AllAvailableChoices()[0];
+                        if (targetNPC.DisplayName.ToLower().Contains("yiria"))
+                        {
+                            if (targetNPC.AllAvailableChoices()[0].ChildLines.Count > 1)
+                            {
+                                while ((currentDiologue.TextOptions.Count <= 0 || currentDiologue.TextOptions[0].ToLower() != "accept") && currentDiologue.ChildLines.Count > 0)
+                                {
+                                    currentDiologue = currentDiologue.ChildLines[0];
+                                }
+                            }
+                            else
+                            {
+                                currentDiologue = targetNPC.AllAvailableChoices()[1];
+                                while ((currentDiologue.TextOptions.Count <= 0 || currentDiologue.TextOptions[0].ToLower() != "accept") && currentDiologue.ChildLines.Count > 0)
+                                {
+                                    currentDiologue = currentDiologue.ChildLines[0];
+                                }
+                            }
+                            targetNPC.SelectChoice(currentDiologue, true, true);
+                        }
+                        else if(targetNPC.DisplayName.ToLower().Contains("bomy"))
+                        {
+                            targetNPC.SelectChoice(targetNPC.AllAvailableChoices()[0], true, true);
+                        }
+                        else if(targetNPC.DisplayName.ToLower().Contains("oskal"))
+                        {
+                            while (currentDiologue.ChildLines.Count > 0)
+                            {
+                                currentDiologue = currentDiologue.ChildLines[0];
+                            }
+                            targetNPC.SelectChoice(currentDiologue, true, true);
+                        }
+                        else
+                        {
+                            while ((currentDiologue.TextOptions.Count <= 0 || currentDiologue.TextOptions[0].ToLower() != "accept") && currentDiologue.ChildLines.Count > 0)
+                            {
+                                currentDiologue = currentDiologue.ChildLines[0];
+                            }
+                            if (currentDiologue.TextOptions[0].ToLower() == "accept")
+                            {
+                                targetNPC.SelectChoice(currentDiologue, true, true);
+                            }
+                        }
+                        
+                        
+                    }
+                    else if (targetNPC.HasMissionEndAvailable)
+                    {
+                        if (targetNPC.AllAvailableChoices().Count > 0)
+                        {
+                            targetNPC.SelectChoice(targetNPC.AllAvailableChoices()[0], true, true);
+                        }
+                        try
+                        {
+                            targetNPC.BeginDialogue();
+                        }
+                        catch { }
+                    }
+                    return;
+                }
+            }
             if (__instance.StartingShip.CurrentRace != null) __instance.StartingShip.AutoTarget = false;
             else __instance.StartingShip.AutoTarget = true;
             if (__instance.StartingShip.MyFlightAI.cachedRepairDepotList.Count > 0 && __instance.StartingShip.MyStats.HullCurrent / __instance.StartingShip.MyStats.HullMax < 0.99f)
             {
-                PLServer.Instance.CaptainSetOrderID(9);
+                if (PLServer.Instance.CaptainsOrdersID != 9) PLServer.Instance.CaptainSetOrderID(9);
                 __instance.StartingShip.AlertLevel = 0;
                 PLRepairDepot repair = __instance.StartingShip.MyFlightAI.cachedRepairDepotList[0];
-                if (repair.TargetShip == __instance.StartingShip && !__instance.StartingShip.ShieldIsActive && Time.time - LastAction > 1f) 
+                if (repair.TargetShip == __instance.StartingShip && !__instance.StartingShip.ShieldIsActive && Time.time - LastAction > 1f)
                 {
                     int ammount = 0;
                     int price = 0;
@@ -121,31 +244,31 @@ namespace CapBot
                     LastAction = Time.time;
                 }
             }
-            else if (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count > 0 && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned) 
+            else if (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count > 0 && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned)
             {
                 PLServer.Instance.CaptainSetOrderID(8);
                 __instance.StartingShip.AlertLevel = 0;
             }
-            else if((__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) || __instance.StartingShip.TargetSpaceTarget != null) 
+            else if ((__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) || __instance.StartingShip.TargetSpaceTarget != null)
             {
                 PLServer.Instance.CaptainSetOrderID(4);
                 __instance.StartingShip.AlertLevel = 2;
             }
-            else 
+            else
             {
                 PLServer.Instance.CaptainSetOrderID(1);
                 __instance.StartingShip.AlertLevel = 0;
             }
-            if(Time.time - __instance.StartingShip.LastTookDamageTime() < 10f && __instance.StartingShip.AlertLevel == 0) 
+            if (Time.time - __instance.StartingShip.LastTookDamageTime() < 10f && __instance.StartingShip.AlertLevel == 0)
             {
                 __instance.StartingShip.AlertLevel = 1;
             }
-            if(__instance.StartingShip.CurrentHailTargetSelection != null) 
+            if (__instance.StartingShip.CurrentHailTargetSelection != null)
             {
-                if(__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_StartPickupMission) 
+                if (__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_StartPickupMission)
                 {
                     PLHailTarget_StartPickupMission mission = __instance.StartingShip.CurrentHailTargetSelection as PLHailTarget_StartPickupMission;
-                    if(mission.PickupMissionID != -1 && !PLServer.Instance.HasActiveMissionWithID(mission.PickupMissionID)) 
+                    if (mission.PickupMissionID != -1 && !PLServer.Instance.HasActiveMissionWithID(mission.PickupMissionID))
                     {
                         PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
                         {
@@ -155,17 +278,21 @@ namespace CapBot
                         __instance.StartingShip.TargetHailTargetID = -1;
                     }
                 }
-                if(__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_Ship && Time.time - LastAction > 3f) 
+                if (__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_Ship && Time.time - LastAction > 3f)
                 {
                     PLHailTarget_Ship ship = __instance.StartingShip.CurrentHailTargetSelection as PLHailTarget_Ship;
-                    if (ship.Hostile()) 
+                    if (ship.Hostile())
+                    {
+                        __instance.StartingShip.OnHailChoiceSelected(0, true, false);
+                    }
+                    else if (PLServer.GetCurrentSector().MissionSpecificID == 20572 && PLServer.Instance.HasActiveMissionWithID(20572) && !PLServer.Instance.GetMissionWithID(20572).Ended && PLEncounterManager.Instance.PlayerShip != null && PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules > 1)
                     {
                         __instance.StartingShip.OnHailChoiceSelected(0, true, false);
                     }
                     LastAction = Time.time;
                 }
             }
-            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WD_MISSIONCHAIN_WEAPONS_DEMO && !PLServer.Instance.HasCompletedMissionWithID(59682)) 
+            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WD_MISSIONCHAIN_WEAPONS_DEMO && !PLServer.Instance.HasCompletedMissionWithID(59682)) //In the W.D. Weapons testing mission 
             {
                 __instance.MyBot.AI_TargetPos = new Vector3(165, -124, -64);
                 __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
@@ -186,13 +313,13 @@ namespace CapBot
                     PLServer.Instance.GetMissionWithID(59682).Objectives[1].AmountCompleted = 1;
                     WeaponsTest = Time.time;
                 }
-                if (__instance.GetPawn().SpawnedInArena) 
+                if (__instance.GetPawn().SpawnedInArena)
                 {
                     __instance.MyBot.AI_TargetPos = new Vector3(126, -139, -27);
                     __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
                     __instance.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
                     __instance.MyBot.TickFindInvaderAction(null);
-                    
+
                 }
                 return;
             }
@@ -254,7 +381,7 @@ namespace CapBot
                             arena.StartArena(0);
                             __instance.GetPawn().transform.position = new Vector3(103, 4, -115);
                         }
-                        else if(arena.ArenaIsActive && __instance.GetPawn().SpawnedInArena) 
+                        else if (arena.ArenaIsActive && __instance.GetPawn().SpawnedInArena)
                         {
                             __instance.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
                             __instance.MyBot.TickFindInvaderAction(null);
@@ -605,7 +732,7 @@ namespace CapBot
                     }
                 }
             }
-            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.GREY_HUNTSMAN_HQ && PLServer.Instance.HasActiveMissionWithID(104869) && !PLServer.Instance.GetMissionWithID(104869).Ended && !PLServer.Instance.IsFragmentCollected(7))
+            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.GREY_HUNTSMAN_HQ && PLServer.Instance.HasActiveMissionWithID(104869) && !PLServer.Instance.GetMissionWithID(104869).Ended && !PLServer.Instance.IsFragmentCollected(7))//Get fragment from grey hunstman
             {
                 __instance.MyBot.AI_TargetPos = new Vector3(217, 111, -108);
                 __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
@@ -743,7 +870,7 @@ namespace CapBot
                         if (pluiscreen.PlayerControlAlpha >= 0.9f)
                         {
                             screensCaptured++;
-                            if ((pluiscreen as PLCaptainScreen) != null) 
+                            if ((pluiscreen as PLCaptainScreen) != null)
                             {
                                 CaptainScreenCaptured = true;
                             }
@@ -751,7 +878,7 @@ namespace CapBot
                         num2++;
                     }
                 }
-                if(screensCaptured >= num2 / 2 && CaptainScreenCaptured) 
+                if (screensCaptured >= num2 / 2 && CaptainScreenCaptured)
                 {
                     foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)
                     {
@@ -759,6 +886,54 @@ namespace CapBot
                         {
                             __instance.MyBot.AI_TargetPos = pluiscreen.transform.position;
                             __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            break;
+                        }
+                    }
+                    __instance.MyBot.AI_TargetTLI = targetEnemy.MyTLI;
+                    if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
+                    {
+                        __instance.MyBot.EnablePathing = true;
+                    }
+                    else
+                    {
+                        PLServer.Instance.photonView.RPC("ClaimShip", PhotonTargets.MasterClient, new object[]
+                        {
+                            targetEnemy.ShipID
+                        });
+                    }
+                    return;
+                }
+            }
+            if (__instance.StartingShip == null && __instance.MyCurrentTLI.MyShipInfo != null)
+            {
+                PLShipInfo targetEnemy = __instance.MyCurrentTLI.MyShipInfo;
+                int screensCaptured = 0;
+                int num2 = 0;
+                bool CaptainScreenCaptured = false;
+                foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)
+                {
+                    if (pluiscreen != null && !pluiscreen.IsClonedScreen)
+                    {
+                        if (pluiscreen.PlayerControlAlpha >= 0.9f)
+                        {
+                            screensCaptured++;
+                            if ((pluiscreen as PLCaptainScreen) != null)
+                            {
+                                CaptainScreenCaptured = true;
+                            }
+                        }
+                        num2++;
+                    }
+                }
+                if (screensCaptured >= num2 / 2 && CaptainScreenCaptured)
+                {
+                    foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)
+                    {
+                        if ((pluiscreen as PLCaptainScreen) != null)
+                        {
+                            __instance.MyBot.AI_TargetPos = pluiscreen.transform.position;
+                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
+                            break;
                         }
                     }
                     __instance.MyBot.AI_TargetTLI = targetEnemy.MyTLI;
@@ -1010,12 +1185,12 @@ namespace CapBot
                 }
             }
         }
-        static void WarpGuardianBattle(PLPlayer CapBot) 
+        static void WarpGuardianBattle(PLPlayer CapBot)
         {
             if (PLWarpGuardian.Instance == null) return;
-            if(PLWarpGuardian.Instance.GetCurrentPhase() == 1) 
+            if (PLWarpGuardian.Instance.GetCurrentPhase() == 1)
             {
-                if (!PLWarpGuardian.Instance.BottomArmor.Destroyed) 
+                if (!PLWarpGuardian.Instance.BottomArmor.Destroyed)
                 {
                     PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.BottomArmor;
                 }
@@ -1032,7 +1207,7 @@ namespace CapBot
                     PLEncounterManager.Instance.PlayerShip.TargetSpaceTarget = PLWarpGuardian.Instance.SideEnergyProjWeapon;
                 }
             }
-            else 
+            else
             {
                 if (!PLWarpGuardian.Instance.BoardingSystem.Destroyed)
                 {
@@ -1084,7 +1259,7 @@ namespace CapBot
             {
                 destines.Add(GWG);
             }
-            else if(PLEncounterManager.Instance.PlayerShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && PLServer.Instance.PTCountdownArmed && (PLServer.Instance.PTCountdownTime <= 600 || PLEncounterManager.Instance.PlayerShip.GetCombatLevel() >= 80)) 
+            else if (PLEncounterManager.Instance.PlayerShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && PLServer.Instance.PTCountdownArmed && (PLServer.Instance.PTCountdownTime <= 600 || PLEncounterManager.Instance.PlayerShip.GetCombatLevel() >= 80))
             {
                 destines.Add(PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.PT_WARP_GATE));
             }
@@ -1320,9 +1495,9 @@ namespace CapBot
             return instructionsList.AsEnumerable();
         }
         */
-        static void Postfix(PLPlayer __instance, ref AIDataIndividual __result) 
+        static void Postfix(PLPlayer __instance, ref AIDataIndividual __result)
         {
-            if(__instance.cachedAIData == null && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot) 
+            if (__instance.cachedAIData == null && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot)
             {
                 __instance.cachedAIData = new AIDataIndividual();
                 PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
@@ -1330,7 +1505,7 @@ namespace CapBot
             __result = __instance.cachedAIData;
         }
     }
-    
+
     [HarmonyPatch(typeof(PLGlobal), "EnterNewGame")]
     class OnJoin
     {
