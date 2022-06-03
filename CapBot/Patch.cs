@@ -49,9 +49,9 @@ namespace CapBot
                         break;
                     }
                 }
-                foreach(PLShipInfoBase ship in PLEncounterManager.Instance.AllShips.Values) //Attack everyone that hates us, and warp disable beacons
+                foreach (PLShipInfoBase ship in PLEncounterManager.Instance.AllShips.Values) //Attack everyone that hates us, and warp disable beacons
                 {
-                    if (ship.HostileShips.Contains(__instance.StartingShip.ShipID) || (ship.ShipTypeID == EShipType.E_BEACON && (ship as PLBeaconInfo).BeaconType == EBeaconType.E_WARP_DISABLE)) 
+                    if (ship.HostileShips.Contains(__instance.StartingShip.ShipID) || (ship.ShipTypeID == EShipType.E_BEACON && (ship as PLBeaconInfo).BeaconType == EBeaconType.E_WARP_DISABLE))
                     {
                         __instance.StartingShip.HostileShips.Add(ship.ShipID);
                     }
@@ -71,6 +71,11 @@ namespace CapBot
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.LCWBATTLE)//In the warp guardian battle 
             {
                 WarpGuardianBattle(__instance);
+                return;
+            }
+            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WASTEDWING)
+            {
+                WastedWing(__instance);
                 return;
             }
             PLSectorInfo sector = PLServer.GetCurrentSector();
@@ -1454,9 +1459,365 @@ namespace CapBot
         {
             PLBot AI = CapBot.MyBot;
             PLPawn pawn = CapBot.GetPawn();
-            PLTeleportationLocationInstance planet = null;
+            PLQuarantineDoor FirstDoor = null;
+            PLQuarantineDoor SlimeDoors = null;
+            PLRobotWalkerLarge paladin = null;
+            foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+            {
+                if (teleport.name == "PLGamePlanet")
+                {
+                    CapBot.MyBot.AI_TargetTLI = teleport;
+                    break;
+                }
+            }
+            foreach (PLQuarantineDoor teleport in Object.FindObjectsOfType(typeof(PLQuarantineDoor)))
+            {
+                if (teleport.name == "QuarantineDoor1")
+                {
+                    FirstDoor = teleport;
+                    break;
+                }
+            }
+            foreach (PLQuarantineDoor teleport in Object.FindObjectsOfType(typeof(PLQuarantineDoor)))
+            {
+                if (teleport.name == "QuarantineDoor1 (5)")
+                {
+                    SlimeDoors = teleport;
+                    break;
+                }
+            }
+            foreach (PLRobotWalkerLarge teleport in Object.FindObjectsOfType(typeof(PLRobotWalkerLarge)))
+            {
+                if (teleport.name.Contains("Clone"))
+                {
+                    paladin = teleport;
+                    break;
+                }
+            }
             if (!PLServer.AnyPlayerHasItemOfName("Entrance Security Keycard")) //Step 1: Find keycard
             {
+                PLRandomChildItem positions = null;
+                foreach (PLRandomChildItem teleport in Object.FindObjectsOfType(typeof(PLRandomChildItem)))
+                {
+                    if (teleport.name == "KeycardRCI")
+                    {
+                        positions = teleport;
+                        break;
+                    }
+                }
+                if (positions != null)
+                {
+                    List<GameObject> keycards = new List<GameObject>();
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    {
+                        keycards.Add(item.gameObject);
+                    }
+                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                }
+                foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                {
+                    if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            inObj.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+            }
+            else if (FirstDoor != null && !FirstDoor.IsDoorOpen)//Step 2: Open the first containment door 
+            {
+                AI.AI_TargetPos = new Vector3(58, -103, -97);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+            }
+            else if (SlimeDoors != null && !SlimeDoors.IsDoorOpen)//Step 3: Kill Experiment 72 
+            {
+                if (pawn.Health / pawn.MaxHealth > 0.25f) AI.AI_TargetPos = new Vector3(59, -141, -184);
+                else AI.AI_TargetPos = new Vector3(60, -151, -186);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+            }
+            else if (!PLServer.AnyPlayerHasItemOfName("Level 1 Admin Access Card"))//Step 4: Find keycard 1 
+            {
+                PLRandomChildItem positions = null;
+                foreach (PLRandomChildItem teleport in Object.FindObjectsOfType(typeof(PLRandomChildItem)))
+                {
+                    if (teleport.name == "Keycard_ADMIN_Lvl_1_RCI")
+                    {
+                        positions = teleport;
+                        break;
+                    }
+                }
+                if (positions != null)
+                {
+                    List<GameObject> keycards = new List<GameObject>();
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    {
+                        keycards.Add(item.gameObject);
+                    }
+                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                }
+                foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                {
+                    if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            inObj.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+            }
+            else if (!PLServer.Instance.HasMissionWithID(55400))//Step 5: Get kill Stalker Mission 
+            {
+
+                AI.AI_TargetPos = new Vector3(-12, -151, -176);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                if ((pawn.transform.position - AI.AI_TargetPos).magnitude < 6f)
+                {
+                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                        {
+                        55400,
+                        true
+                        });
+                }
+            }
+            else if (!PLServer.Instance.HasCompletedMissionWithID(55400))//Step 6: Kill Stalker 
+            {
+                AI.AI_TargetPos = new Vector3(23, -233, -88);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+            }
+            else if (!PLServer.AnyPlayerHasItemOfName("Level 2 Admin Access Card"))//Step 7: Find keycard 2
+            {
+                PLRandomChildItem positions = null;
+                foreach (PLRandomChildItem teleport in Object.FindObjectsOfType(typeof(PLRandomChildItem)))
+                {
+                    if (teleport.name == "Keycard_ADMIN_Lvl_2_RCI")
+                    {
+                        positions = teleport;
+                        break;
+                    }
+                }
+                if (positions != null)
+                {
+                    List<GameObject> keycards = new List<GameObject>();
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    {
+                        keycards.Add(item.gameObject);
+                    }
+                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                }
+                foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                {
+                    if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            inObj.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+            }
+            else if (paladin != null) //Step 8: Kill Elite Paladin
+            {
+                AI.HighPriorityTarget = paladin;
+                AI.AI_TargetPos = new Vector3(21, -227, 394);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+            }
+            else if (!PLServer.AnyPlayerHasItemOfName("Level 3 Admin Access Card")) //Step 9: Find level 3 keycard 
+            {
+                PLRandomChildItem positions = null;
+                foreach (PLRandomChildItem teleport in Object.FindObjectsOfType(typeof(PLRandomChildItem)))
+                {
+                    if (teleport.name == "Keycard_ADMIN_Lvl_3_RCI")
+                    {
+                        positions = teleport;
+                        break;
+                    }
+                }
+                if (positions != null)
+                {
+                    List<GameObject> keycards = new List<GameObject>();
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    {
+                        keycards.Add(item.gameObject);
+                    }
+                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                }
+                foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                {
+                    if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            inObj.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+            }
+            else if (!PLServer.Instance.HasMissionWithID(55401) || !PLServer.Instance.HasMissionWithID(55402)) //Step 10: Get kill Scientist and get medicine Missions 
+            {
+                if (!PLServer.Instance.HasActiveMissionWithID(55401))
+                {
+                    AI.AI_TargetPos = new Vector3(-12, -151, 463);
+                }
+                else
+                {
+                    AI.AI_TargetPos = new Vector3(-13, -151, 479);
+                }
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                if ((pawn.transform.position - new Vector3(-12, -151, 463)).magnitude < 6f && !PLServer.Instance.HasActiveMissionWithID(55401))
+                {
+                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                        {
+                        55401,
+                        true
+                        });
+                }
+                else if ((pawn.transform.position - new Vector3(-13, -151, 479)).magnitude < 6f)
+                {
+                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                            {
+                        55402,
+                        true
+                            });
+                }
+            }
+            else if (!PLServer.Instance.HasCompletedMissionWithID(55401)) //Step 11: Kill crystal scientists
+            {
+                List<PLInfectedScientist> crystals = new List<PLInfectedScientist>();
+                foreach (PLInfectedScientist crystal in Object.FindObjectsOfType(typeof(PLInfectedScientist)))
+                {
+                    if (!crystal.IsDead)
+                    {
+                        crystals.Add(crystal);
+                    }
+                }
+                if (crystals.Count > 0)
+                {
+                    AI.AI_TargetPos = crystals[0].transform.position;
+                    foreach (PLInfectedScientist crystal in crystals)
+                    {
+                        if ((pawn.transform.position - crystal.transform.position).magnitude < (pawn.transform.position - AI.AI_TargetPos).magnitude)
+                        {
+                            AI.AI_TargetPos = crystal.transform.position;
+                        }
+                    }
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                }
+            }
+            else if (!PLServer.Instance.HasCompletedMissionWithID(55402)) //Step 12: Finish Medicine mission
+            {
+                if (!PLServer.AnyPlayerHasItemOfName("Medicine Pack"))
+                {
+                    AI.AI_TargetPos = new Vector3(-130, -151, 459);
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                    {
+                        if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                        {
+                            CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                                {
+                            inObj.PickupID
+                                });
+                            CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                            PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                        }
+                    }
+                }
+                else
+                {
+                    AI.AI_TargetPos = new Vector3(-14, -151, 479);
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    if ((pawn.transform.position - new Vector3(-12, -151, 463)).magnitude < 6f)
+                    {
+                        PLServer.Instance.AttemptCompleteObjective("mission55402obj2");
+                    }
+                }
+            }
+            else if (!PLServer.AnyPlayerHasItemOfName("Data Pad")) //Step 13: Get Data Pad
+            {
+                AI.AI_TargetPos = new Vector3(-154, -151, 498);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                foreach (PLPickupComponent component in Object.FindObjectsOfType(typeof(PLPickupComponent)))
+                {
+                    if ((pawn.transform.position - component.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupComponentAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            component.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+                foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                {
+                    if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            inObj.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+                foreach (PLPickupRandomComponent component in Object.FindObjectsOfType(typeof(PLPickupRandomComponent)))
+                {
+                    if ((pawn.transform.position - component.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupRandomComponentAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            component.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+            }
+            else if (!PLServer.AnyPlayerHasItemOfName("Aberrant Organisms Lab Access Card")) //Step 14: Get Access card
+            {
+                AI.AI_TargetPos = new Vector3(-120, -151, 501);
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
+                {
+                    if ((pawn.transform.position - inObj.transform.position).magnitude < 8f)
+                    {
+                        CapBot.photonView.RPC("AttemptToPickupObjectAtID", PhotonTargets.MasterClient, new object[]
+                            {
+                            inObj.PickupID
+                            });
+                        CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
+                        PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                    }
+                }
+            }
+            else //step 15: Kill the crystal guy
+            {
+                if (pawn.Health / pawn.MaxHealth > 0.25f) AI.AI_TargetPos = new Vector3(-108, -152, 575);
+                else AI.AI_TargetPos = new Vector3(-100, -152, 575);
+                foreach (PLInterior interior in Object.FindObjectsOfType(typeof(PLInterior)))
+                {
+                    if (interior.name == "Area_05_Interior")
+                    {
+                        AI.AI_TargetInterior = interior;
+                        break;
+                    }
+                }
+                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                AI.HighPriorityTarget = PLInGameUI.Instance.BossUI_Target;
             }
         }
 
