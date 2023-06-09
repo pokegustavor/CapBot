@@ -37,14 +37,14 @@ namespace CapBot
                     botcounter++;
                 }
             }
-            if (botcounter >= 5) SpawnBot.crewisbot = true;
+            if (botcounter >= 5) SpawnBot.crewisbot = true; //Enables special stuff if everyone is bot on the crew
             else SpawnBot.crewisbot = false;
             if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2) //set race to robot in paladin
             {
                 __instance.RaceID = 2;
             }
             bool HasIntruders = false;
-            if (__instance.StartingShip != null)
+            if (__instance.StartingShip != null) //Check for intruders and set hostile ships
             {
                 foreach (PLPlayer player in PLServer.Instance.AllPlayers) // Find if there is intruders in the ship
                 {
@@ -62,7 +62,7 @@ namespace CapBot
                     }
                 }
             }
-            if (__instance.StartingShip != null && __instance.StartingShip.InWarp && PLServer.Instance.AllPlayersLoaded() && (__instance.StartingShip.MyShieldGenerator == null || __instance.StartingShip.MyStats.ShieldsCurrent / __instance.StartingShip.MyStats.ShieldsMax > 0.99)) //Skip warp
+            if (__instance.StartingShip != null && __instance.StartingShip.InWarp && PLServer.Instance.AllPlayersLoaded() && (__instance.StartingShip.MyShieldGenerator == null || __instance.StartingShip.MyStats.ShieldsCurrent / __instance.StartingShip.MyStats.ShieldsMax > 0.99)) //Skip warp when ready
                 PLInGameUI.Instance.WarpSkipButtonClicked();
             if (__instance.MyBot.AI_TargetPos != __instance.StartingShip.CaptainsChairPivot.position && __instance.StartingShip.CaptainsChairPlayerID == __instance.GetPlayerID())//leave chair
             {
@@ -78,7 +78,7 @@ namespace CapBot
                 WarpGuardianBattle(__instance);
                 return;
             }
-            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WASTEDWING)
+            if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.WASTEDWING)//In the wasted wing
             {
                 WastedWing(__instance);
                 return;
@@ -89,7 +89,7 @@ namespace CapBot
                         || sector.VisualIndication == ESectorVisualIndication.COLONIAL_HUB || sector.VisualIndication == ESectorVisualIndication.WD_START || sector.VisualIndication == ESectorVisualIndication.SPACE_SCRAPYARD || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_01 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_02 || sector.VisualIndication == ESectorVisualIndication.FLUFFY_FACTORY_03 || sector.VisualIndication == ESectorVisualIndication.SPACE_CAVE_2)
             {
                 //In a sector with a store
-                if (PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules <= 15)
+                if (PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules <= 15)//Buy fuel capsules if needed
                 {
                     int numoffuels = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetFuelBasePrice() * ShopRepMultiplier()) / 2;
                     numoffuels = Mathf.Min(numoffuels, 200 - PLEncounterManager.Instance.PlayerShip.NumberOfFuelCapsules);
@@ -102,7 +102,7 @@ namespace CapBot
                         });
                     }
                 }
-                if (PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent < 0.9f)
+                if (PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent < 0.9f)//Buy coolant if needed
                 {
                     int numofcoolant = PLServer.Instance.CurrentCrewCredits / (int)(PLServer.Instance.GetCoolantBasePrice() * ShopRepMultiplier());
                     numofcoolant = Mathf.Min(numofcoolant, (int)((1 - PLEncounterManager.Instance.PlayerShip.ReactorCoolantLevelPercent) * 8));
@@ -116,7 +116,7 @@ namespace CapBot
                     }
 
                 }
-                foreach (PLShipComponent component in PLEncounterManager.Instance.PlayerShip.MyStats.AllComponents)
+                foreach (PLShipComponent component in PLEncounterManager.Instance.PlayerShip.MyStats.AllComponents)//Buy missile refill if needed
                 {
                     if (component is PLTrackerMissile)
                     {
@@ -167,15 +167,16 @@ namespace CapBot
                 }
                 if (allNPC.Count > 0) //if there is at least 1 mission to gather or deliver
                 {
-                    if (PLServer.Instance.CaptainsOrdersID != 11)
+                    if (PLServer.Instance.CaptainsOrdersID != 11 && Time.time - LastOrder > 1f)
                     {
+                        LastOrder = Time.time;
                         PLServer.Instance.CaptainSetOrderID(11);
                     }
                     float NearestNPCDistance = (allNPC[0].gameObject.transform.position - __instance.GetPawn().transform.position).magnitude;
                     __instance.MyBot.AI_TargetPos = allNPC[0].gameObject.transform.position;
                     __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
                     PLDialogueActorInstance targetNPC = allNPC[0];
-                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType<PLTeleportationLocationInstance>())
                     {
                         if (teleport.name == "PLGamePlanet" || teleport.name == "PL_GamePlanet" || teleport.name == "PLGame")
                         {
@@ -268,7 +269,11 @@ namespace CapBot
                 int screensCaptured = 0;
                 int num2 = 0;
                 bool CaptainScreenCaptured = false;
-                PLServer.Instance.CaptainSetOrderID(6);
+                if (PLServer.Instance.CaptainsOrdersID != 6 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(6);
+                }
                 __instance.StartingShip.AlertLevel = 2;
                 __instance.MyBot.AI_TargetTLI = targetEnemy.MyTLI;
                 foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)
@@ -359,10 +364,10 @@ namespace CapBot
                     return;
                 }
             }
-            if (__instance.StartingShip.CurrentRace != null) __instance.StartingShip.AutoTarget = false;
+            if (__instance.StartingShip.CurrentRace != null) __instance.StartingShip.AutoTarget = false; //Disables ship autotarget when racing
             else __instance.StartingShip.AutoTarget = true;
             //Set captain orders and special actions
-            if (__instance.StartingShip.MyFlightAI.cachedRepairDepotList.Count > 0 && __instance.StartingShip.MyStats.HullCurrent / __instance.StartingShip.MyStats.HullMax < 0.99f)
+            if (__instance.StartingShip.MyFlightAI.cachedRepairDepotList.Count > 0 && __instance.StartingShip.MyStats.HullCurrent / __instance.StartingShip.MyStats.HullMax < 0.99f)//Repair procedures on repair station
             {
                 if (PLServer.Instance.CaptainsOrdersID != 9 && Time.time - LastOrder > 1f)
                 {
@@ -371,7 +376,7 @@ namespace CapBot
                 }
                 __instance.StartingShip.AlertLevel = 0;
                 PLRepairDepot repair = __instance.StartingShip.MyFlightAI.cachedRepairDepotList[0];
-                if (repair.TargetShip == __instance.StartingShip && !__instance.StartingShip.ShieldIsActive && Time.time - LastAction > 1f)
+                if (repair.TargetShip == __instance.StartingShip && !__instance.StartingShip.ShieldIsActive && Time.time - LastAction > 1f)//Uses repair station if possible
                 {
                     int ammount = 0;
                     int price = 0;
@@ -384,7 +389,7 @@ namespace CapBot
                     LastAction = Time.time;
                 }
             }
-            else if (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count > 0 && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned)
+            else if (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count > 0 && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned)//Asks to use the warp gate
             {
                 if (PLServer.Instance.CaptainsOrdersID != 8 && Time.time - LastOrder > 1f)
                 {
@@ -584,7 +589,7 @@ namespace CapBot
                     }
                 }
             }
-            else if(PLStarmap.Instance.CurrentShipPath.Count > 0 && (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count == 0 || (!__instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].TargetedWarpSectorID == -1)))//Align the ship
+            else if (PLStarmap.Instance.CurrentShipPath.Count > 0 && (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count == 0 || (!__instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].TargetedWarpSectorID == -1)))//Align the ship
             {
                 if (PLServer.Instance.CaptainsOrdersID != 10 && Time.time - LastOrder > 1f)
                 {
@@ -602,13 +607,13 @@ namespace CapBot
                 }
                 __instance.StartingShip.AlertLevel = 0;
             }
-            if (Time.time - __instance.StartingShip.LastTookDamageTime() < 10f && __instance.StartingShip.AlertLevel == 0)
+            if (Time.time - __instance.StartingShip.LastTookDamageTime() < 10f && __instance.StartingShip.AlertLevel == 0) //Yellow alert if took damage recently and doesn't have a target
             {
                 __instance.StartingShip.AlertLevel = 1;
             }
-            if (__instance.StartingShip.CurrentHailTargetSelection != null)
+            if (__instance.StartingShip.CurrentHailTargetSelection != null)//Handle ship comms
             {
-                if (__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_StartPickupMission)
+                if (__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_StartPickupMission)//Accepts any missions from long range comms
                 {
                     PLHailTarget_StartPickupMission mission = __instance.StartingShip.CurrentHailTargetSelection as PLHailTarget_StartPickupMission;
                     if (mission.PickupMissionID != -1 && !PLServer.Instance.HasActiveMissionWithID(mission.PickupMissionID))
@@ -621,7 +626,7 @@ namespace CapBot
                         __instance.StartingShip.TargetHailTargetID = -1;
                     }
                 }
-                if (__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_Ship && Time.time - LastAction > 3f)
+                if (__instance.StartingShip.CurrentHailTargetSelection is PLHailTarget_Ship && Time.time - LastAction > 3f)//Does dialogue with ships
                 {
                     PLHailTarget_Ship ship = __instance.StartingShip.CurrentHailTargetSelection as PLHailTarget_Ship;
                     if (ship.Hostile())
@@ -672,9 +677,9 @@ namespace CapBot
                 LastAction = Time.time;
                 return;
             }
-            if (PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3))
+            if (PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3))//In any of the races
             {
-                AtRaces(__instance,ref LastAction);
+                AtRaces(__instance, ref LastAction);
                 return;
             }
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.GREY_HUNTSMAN_HQ && PLServer.Instance.HasActiveMissionWithID(104869) && !PLServer.Instance.GetMissionWithID(104869).Ended && !PLServer.Instance.IsFragmentCollected(7))//Get fragment from grey hunstman
@@ -1468,7 +1473,7 @@ namespace CapBot
                 AI.HighPriorityTarget = PLInGameUI.Instance.BossUI_Target;
             }
         }
-        static void Burrow(PLPlayer CapBot) 
+        static void Burrow(PLPlayer CapBot)
         {
             if (PLServer.Instance.CurrentCrewCredits >= 100000)
             {
@@ -1534,7 +1539,7 @@ namespace CapBot
                 }
             }
         }
-        static void AtRaces(PLPlayer CapBot, ref float LastAction) 
+        static void AtRaces(PLPlayer CapBot, ref float LastAction)
         {
             PLRace race = (Object.FindObjectOfType(typeof(PLRaceStartScreen)) as PLRaceStartScreen).MyRace;
             PLPickupComponent prize = Object.FindObjectOfType(typeof(PLPickupComponent)) as PLPickupComponent;
