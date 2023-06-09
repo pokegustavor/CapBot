@@ -4,6 +4,10 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Linq;
+
+//Fix visit planet and complete missions warnings
+//Fix Boarding command and action
+//Fix route control
 namespace CapBot
 {
     [HarmonyPatch(typeof(PLPlayer), "UpdateAIPriorities")]
@@ -13,8 +17,18 @@ namespace CapBot
         static float LastMapUpdate = Time.time;
         static float LastBlindJump = 0;
         static float WeaponsTest = Time.time;
+        static float LastOrder = Time.time;
         static void Postfix(PLPlayer __instance)
         {
+            if ((__instance.cachedAIData == null || __instance.cachedAIData.Priorities.Count == 0) && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot) //Give default AI priorities
+            {
+                //if (__instance.cachedAIData == null) PulsarModLoader.Utilities.Messaging.Notification("Null value!");
+                //if (__instance.cachedAIData != null) PulsarModLoader.Utilities.Messaging.Notification("Priorities value: " + __instance.cachedAIData.Priorities.Count);
+                //PulsarModLoader.Utilities.Messaging.Notification("Name: " + __instance.cachedAIData.Priorities.Count);
+                if (__instance.cachedAIData == null) __instance.cachedAIData = new AIDataIndividual();
+                PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
+            }
+            if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient || __instance.StartingShip == null) return;
             int botcounter = 0; //Counts to check if crew is bot (for bots only games)
             foreach (PLPlayer player in PLServer.Instance.AllPlayers)
             {
@@ -25,15 +39,6 @@ namespace CapBot
             }
             if (botcounter >= 5) SpawnBot.crewisbot = true;
             else SpawnBot.crewisbot = false;
-            if ((__instance.cachedAIData == null || __instance.cachedAIData.Priorities.Count == 0) && SpawnBot.capisbot && __instance.TeamID == 0 && __instance.IsBot) //Give default AI priorities
-            {
-                //if (__instance.cachedAIData == null) PulsarModLoader.Utilities.Messaging.Notification("Null value!");
-                //if (__instance.cachedAIData != null) PulsarModLoader.Utilities.Messaging.Notification("Priorities value: " + __instance.cachedAIData.Priorities.Count);
-                //PulsarModLoader.Utilities.Messaging.Notification("Name: " + __instance.cachedAIData.Priorities.Count);
-                if (__instance.cachedAIData == null) __instance.cachedAIData = new AIDataIndividual();
-                PLGlobal.Instance.SetupClassDefaultData(ref __instance.cachedAIData, __instance.GetClassID(), false);
-            }
-            if (__instance.GetPawn() == null || !__instance.IsBot || __instance.GetClassID() != 0 || __instance.TeamID != 0 || !PhotonNetwork.isMasterClient || __instance.StartingShip == null) return;
             if (__instance.StartingShip != null && __instance.StartingShip.ShipTypeID == EShipType.E_POLYTECH_SHIP && __instance.RaceID != 2) //set race to robot in paladin
             {
                 __instance.RaceID = 2;
@@ -258,6 +263,7 @@ namespace CapBot
             }
             if (__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip && __instance.StartingShip.TargetShip is PLShipInfo && __instance.StartingShip.TargetShip.TeamID > 0 && (!__instance.StartingShip.TargetShip.IsQuantumShieldActive || __instance.MyCurrentTLI == __instance.StartingShip.TargetShip.MyTLI))
             {
+                //Board enemy to remove claim
                 PLShipInfo targetEnemy = __instance.StartingShip.TargetShip as PLShipInfo;
                 int screensCaptured = 0;
                 int num2 = 0;
@@ -306,13 +312,13 @@ namespace CapBot
                     return;
                 }
             }
-            if (__instance.StartingShip == null && __instance.MyCurrentTLI.MyShipInfo != null)
+            if (__instance.StartingShip == null && __instance.MyCurrentTLI.MyShipInfo != null) //Claim current ship if player ship was destroyed/captured
             {
                 PLShipInfo targetEnemy = __instance.MyCurrentTLI.MyShipInfo;
                 int screensCaptured = 0;
                 int num2 = 0;
                 bool CaptainScreenCaptured = false;
-                foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)
+                foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)//Capture enough screens
                 {
                     if (pluiscreen != null && !pluiscreen.IsClonedScreen)
                     {
@@ -327,7 +333,7 @@ namespace CapBot
                         num2++;
                     }
                 }
-                if (screensCaptured >= num2 / 2 && CaptainScreenCaptured)
+                if (screensCaptured >= num2 / 2 && CaptainScreenCaptured)//Claim the ship
                 {
                     foreach (PLUIScreen pluiscreen in targetEnemy.MyScreenBase.AllScreens)
                     {
@@ -355,9 +361,14 @@ namespace CapBot
             }
             if (__instance.StartingShip.CurrentRace != null) __instance.StartingShip.AutoTarget = false;
             else __instance.StartingShip.AutoTarget = true;
+            //Set captain orders and special actions
             if (__instance.StartingShip.MyFlightAI.cachedRepairDepotList.Count > 0 && __instance.StartingShip.MyStats.HullCurrent / __instance.StartingShip.MyStats.HullMax < 0.99f)
             {
-                if (PLServer.Instance.CaptainsOrdersID != 9) PLServer.Instance.CaptainSetOrderID(9);
+                if (PLServer.Instance.CaptainsOrdersID != 9 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(9);
+                }
                 __instance.StartingShip.AlertLevel = 0;
                 PLRepairDepot repair = __instance.StartingShip.MyFlightAI.cachedRepairDepotList[0];
                 if (repair.TargetShip == __instance.StartingShip && !__instance.StartingShip.ShieldIsActive && Time.time - LastAction > 1f)
@@ -375,22 +386,38 @@ namespace CapBot
             }
             else if (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count > 0 && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned)
             {
-                PLServer.Instance.CaptainSetOrderID(8);
+                if (PLServer.Instance.CaptainsOrdersID != 8 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(8);
+                }
                 __instance.StartingShip.AlertLevel = 0;
             }
-            else if (__instance.StartingShip != null && HasIntruders)
+            else if (__instance.StartingShip != null && HasIntruders) //Repel any intruders
             {
-                PLServer.Instance.CaptainSetOrderID(6);
+                if (PLServer.Instance.CaptainsOrdersID != 6 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(6);
+                }
                 __instance.StartingShip.AlertLevel = 2;
             }
-            else if ((__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) || __instance.StartingShip.TargetSpaceTarget != null)
+            else if ((__instance.StartingShip.TargetShip != null && __instance.StartingShip.TargetShip != __instance.StartingShip) || __instance.StartingShip.TargetSpaceTarget != null)//Kill enemies
             {
-                PLServer.Instance.CaptainSetOrderID(4);
+                if (PLServer.Instance.CaptainsOrdersID != 4 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(4);
+                }
                 __instance.StartingShip.AlertLevel = 2;
             }
-            else if (PLServer.GetCurrentSector().MySPI.HasPlanet && __instance.StartingShip != null)
+            else if (PLServer.GetCurrentSector().MySPI.HasPlanet && __instance.StartingShip != null)//Explore planet
             {
-                PLServer.Instance.CaptainSetOrderID(12);
+                if (PLServer.Instance.CaptainsOrdersID != 12 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(12);
+                }
                 if (SpawnBot.crewisbot || (PLServer.Instance.GetCachedFriendlyPlayerOfClass(2) != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(2).IsBot))
                 {
                     List<PLPawnBase> targets = new List<PLPawnBase>();
@@ -557,9 +584,22 @@ namespace CapBot
                     }
                 }
             }
-            else
+            else if(PLStarmap.Instance.CurrentShipPath.Count > 0 && (__instance.StartingShip.MyFlightAI.cachedWarpStationList.Count == 0 || (!__instance.StartingShip.MyFlightAI.cachedWarpStationList[0].IsAligned && __instance.StartingShip.MyFlightAI.cachedWarpStationList[0].TargetedWarpSectorID == -1)))//Align the ship
             {
-                PLServer.Instance.CaptainSetOrderID(1);
+                if (PLServer.Instance.CaptainsOrdersID != 10 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(10);
+                }
+                __instance.StartingShip.AlertLevel = 0;
+            }
+            else//Just be at atention
+            {
+                if (PLServer.Instance.CaptainsOrdersID != 1 && Time.time - LastOrder > 1f)
+                {
+                    LastOrder = Time.time;
+                    PLServer.Instance.CaptainSetOrderID(1);
+                }
                 __instance.StartingShip.AlertLevel = 0;
             }
             if (Time.time - __instance.StartingShip.LastTookDamageTime() < 10f && __instance.StartingShip.AlertLevel == 0)
@@ -628,412 +668,14 @@ namespace CapBot
             }
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.DESERT_HUB && !PLServer.Instance.IsFragmentCollected(1))//In the burrow
             {
-                if (PLServer.Instance.CurrentCrewCredits >= 100000)
-                {
-                    __instance.MyBot.AI_TargetPos = new Vector3(212, 64, -38);
-                    __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                    {
-                        if (teleport.name == "PLGame")
-                        {
-                            __instance.MyBot.AI_TargetTLI = teleport;
-                            break;
-                        }
-                    }
-                    if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                    {
-                        __instance.MyBot.EnablePathing = true;
-                    }
-                    else
-                    {
-                        PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                        {
-                        100786
-                        });
-                        PLServer.Instance.CollectFragment(1);
-                        PLServer.Instance.CurrentCrewCredits -= 100000;
-                    }
-                }
-                else if (PLServer.Instance.CurrentCrewCredits >= 50000 && PLServer.Instance.CurrentCrewLevel >= 5)
-                {
-                    __instance.MyBot.AI_TargetPos = new Vector3(62, 18, -56);
-                    __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                    PLBurrowArena arena = Object.FindObjectOfType(typeof(PLBurrowArena)) as PLBurrowArena;
-                    if (arena != null)
-                    {
-                        if (__instance.GetPawn().SpawnedInArena)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(103, 4, -115);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            __instance.MyBot.EnablePathing = true;
-                        }
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "PLGame")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4 && !__instance.GetPawn().SpawnedInArena)
-                        {
-                            __instance.MyBot.EnablePathing = true;
-                        }
-                        else if (!arena.ArenaIsActive)
-                        {
-                            arena.StartArena(0);
-                            __instance.GetPawn().transform.position = new Vector3(103, 4, -115);
-                        }
-                        else if (arena.ArenaIsActive && __instance.GetPawn().SpawnedInArena)
-                        {
-                            __instance.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
-                            __instance.MyBot.TickFindInvaderAction(null);
-                        }
-                    }
-                }
+                Burrow(__instance);
                 LastAction = Time.time;
                 return;
             }
             if (PLServer.GetCurrentSector() != null && (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 || PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3))
             {
-                PLRace race = (Object.FindObjectOfType(typeof(PLRaceStartScreen)) as PLRaceStartScreen).MyRace;
-                PLPickupComponent prize = Object.FindObjectOfType(typeof(PLPickupComponent)) as PLPickupComponent;
-                if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR && race != null)
-                {
-                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 1) == 0)
-                    {
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "GarageBSO")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if (!PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.HasActiveMissionWithID(43072) && PLServer.Instance.CurrentCrewCredits >= 1000)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(174, 4, -332);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(43499))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
-                                    {
-                                    43499,
-                                    false
-                                    });
-                                }
-                                else if (!PLServer.Instance.HasActiveMissionWithID(43072) && PLServer.Instance.CurrentCrewCredits >= 1000)
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
-                                    {
-                                    43072,
-                                    false
-                                    });
-                                }
-                            }
-                        }
-                        else
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(158, 4, -341);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                race.SetAsReadyToStart();
-                            }
-                        }
-                        LastAction = Time.time;
-                        return;
-                    }
-                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 1) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.GetMissionWithID(43499).Ended) || (PLServer.Instance.HasActiveMissionWithID(43072) && !PLServer.Instance.GetMissionWithID(43072).Ended)))
-                    {
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "GarageBSO")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if ((PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.GetMissionWithID(43499).Ended) || (PLServer.Instance.HasActiveMissionWithID(43072) && !PLServer.Instance.GetMissionWithID(43072).Ended))
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(174, 4, -332);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                if (PLServer.Instance.HasActiveMissionWithID(43499))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                                    {
-                                    43499
-                                    });
-                                    PLServer.Instance.CurrentCrewCredits += 15000;
-                                }
-                                else if (PLServer.Instance.HasActiveMissionWithID(43072))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                                    {
-                                    43072
-                                    });
-                                    PLServer.Instance.CurrentCrewCredits += 3000;
-                                }
-                            }
-                        }
-                        else if (prize != null && !prize.PickedUp)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(162, 6, -335);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                __instance.AttemptToPickupComponentAtID(prize.PickupID);
-                            }
-                        }
-                        LastAction = Time.time;
-                        return;
-                    }
-                }
-                else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 && race != null)
-                {
-                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 2) == 0)
-                    {
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "GarageBSO")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if (!PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.HasActiveMissionWithID(43938) && PLServer.Instance.CurrentCrewCredits >= 1000)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(123, -15, -345);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(43938))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
-                                    {
-                                    43938,
-                                    false
-                                    });
-                                }
-                                else if (!PLServer.Instance.HasActiveMissionWithID(43932) && PLServer.Instance.CurrentCrewCredits >= 1000)
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
-                                    {
-                                    43932,
-                                    false
-                                    });
-                                }
-                            }
-                        }
-                        else
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(132, -15, -278);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                race.SetAsReadyToStart();
-                            }
-                        }
-                        LastAction = Time.time;
-                        return;
-                    }
-                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 2) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.GetMissionWithID(43932).Ended) || (PLServer.Instance.HasActiveMissionWithID(43938) && !PLServer.Instance.GetMissionWithID(43938).Ended)))
-                    {
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "GarageBSO")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if ((PLServer.Instance.HasActiveMissionWithID(43938) && !PLServer.Instance.GetMissionWithID(43938).Ended) || (PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.GetMissionWithID(43932).Ended))
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(123, -15, -345);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                if (PLServer.Instance.HasActiveMissionWithID(43932))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                                    {
-                                    43932
-                                    });
-                                    PLServer.Instance.CurrentCrewCredits += 3000;
-                                }
-                                else if (PLServer.Instance.HasActiveMissionWithID(43938))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                                    {
-                                    43938
-                                    });
-                                    PLServer.Instance.CurrentCrewCredits += 15000;
-                                }
-                            }
-                        }
-                        else if (prize != null && !prize.PickedUp)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(129, -14, -270);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                __instance.AttemptToPickupComponentAtID(prize.PickupID);
-                            }
-                        }
-                        LastAction = Time.time;
-                        return;
-                    }
-                }
-                else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3 && race != null && (PLServer.Instance.RacesWonBitfield & 1) != 0 && (PLServer.Instance.RacesWonBitfield & 2) != 0)
-                {
-                    if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 4) == 0)
-                    {
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "GarageBSO")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if (!PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.HasActiveMissionWithID(44088) && PLServer.Instance.CurrentCrewCredits >= 1000)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(115, -7, -233);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(44088))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
-                                    {
-                                    44088,
-                                    false
-                                    });
-                                }
-                                else if (!PLServer.Instance.HasActiveMissionWithID(44085) && PLServer.Instance.CurrentCrewCredits >= 1000)
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
-                                    {
-                                    44085,
-                                    false
-                                    });
-                                }
-                            }
-                        }
-                        else
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(106, -7, -234);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                race.SetAsReadyToStart();
-                            }
-                        }
-                        LastAction = Time.time;
-                        return;
-                    }
-                    else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 4) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended)))
-                    {
-                        foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
-                        {
-                            if (teleport.name == "GarageBSO")
-                            {
-                                __instance.MyBot.AI_TargetTLI = teleport;
-                                break;
-                            }
-                        }
-                        if ((PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended))
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(115, -7, -233);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                if (PLServer.Instance.HasActiveMissionWithID(44085))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                                    {
-                                    44085
-                                    });
-                                    PLServer.Instance.CurrentCrewCredits += 15000;
-                                }
-                                else if (PLServer.Instance.HasActiveMissionWithID(44088))
-                                {
-                                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
-                                    {
-                                    44088
-                                    });
-                                    PLServer.Instance.CurrentCrewCredits += 30000;
-                                }
-                            }
-                        }
-                        else if (prize != null && !prize.PickedUp)
-                        {
-                            __instance.MyBot.AI_TargetPos = new Vector3(110, -6, -226);
-                            __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
-                            if ((__instance.MyBot.AI_TargetPos - __instance.GetPawn().transform.position).sqrMagnitude > 4)
-                            {
-                                __instance.MyBot.EnablePathing = true;
-                            }
-                            else
-                            {
-                                __instance.AttemptToPickupComponentAtID(prize.PickupID);
-                            }
-                        }
-                        LastAction = Time.time;
-                        return;
-                    }
-                }
+                AtRaces(__instance,ref LastAction);
+                return;
             }
             if (PLServer.GetCurrentSector() != null && PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.GREY_HUNTSMAN_HQ && PLServer.Instance.HasActiveMissionWithID(104869) && !PLServer.Instance.GetMissionWithID(104869).Ended && !PLServer.Instance.IsFragmentCollected(7))//Get fragment from grey hunstman
             {
@@ -1176,6 +818,7 @@ namespace CapBot
             }
             if (__instance.StartingShip != null && __instance.StartingShip.MyStats.GetShipComponent<PLCaptainsChair>(ESlotType.E_COMP_CAPTAINS_CHAIR, false) != null && Time.time - LastAction > 20f) //Sit in chair
             {
+                //If there is nothing to do captain will sit in the chair
                 __instance.MyBot.AI_TargetPos = __instance.StartingShip.CaptainsChairPivot.position;
                 __instance.MyBot.AI_TargetPos_Raw = __instance.MyBot.AI_TargetPos;
                 __instance.MyBot.AI_TargetTLI = __instance.StartingShip.MyTLI;
@@ -1462,6 +1105,7 @@ namespace CapBot
             PLQuarantineDoor FirstDoor = null;
             PLQuarantineDoor SlimeDoors = null;
             PLRobotWalkerLarge paladin = null;
+            float lastChange = Time.time;
             foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
             {
                 if (teleport.name == "PLGamePlanet")
@@ -1550,15 +1194,17 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null)
+                if (positions != null && Time.time - lastChange > 60)
                 {
+
                     List<GameObject> keycards = new List<GameObject>();
-                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
                     AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    lastChange = Time.time;
                 }
                 foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
                 {
@@ -1603,15 +1249,16 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null)
+                if (positions != null && Time.time - lastChange > 60)
                 {
                     List<GameObject> keycards = new List<GameObject>();
-                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
                     AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    lastChange = Time.time;
                 }
                 foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
                 {
@@ -1643,15 +1290,16 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null)
+                if (positions != null && Time.time - lastChange > 60)
                 {
                     List<GameObject> keycards = new List<GameObject>();
-                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
                     AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    lastChange = Time.time;
                 }
                 foreach (PLPickupObject inObj in PLGameStatic.Instance.m_AllPickupObjects)
                 {
@@ -1820,7 +1468,413 @@ namespace CapBot
                 AI.HighPriorityTarget = PLInGameUI.Instance.BossUI_Target;
             }
         }
+        static void Burrow(PLPlayer CapBot) 
+        {
+            if (PLServer.Instance.CurrentCrewCredits >= 100000)
+            {
+                CapBot.MyBot.AI_TargetPos = new Vector3(212, 64, -38);
+                CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                {
+                    if (teleport.name == "PLGame")
+                    {
+                        CapBot.MyBot.AI_TargetTLI = teleport;
+                        break;
+                    }
+                }
+                if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                {
+                    CapBot.MyBot.EnablePathing = true;
+                }
+                else
+                {
+                    PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                    {
+                        100786
+                    });
+                    PLServer.Instance.CollectFragment(1);
+                    PLServer.Instance.CurrentCrewCredits -= 100000;
+                }
+            }
+            else if (PLServer.Instance.CurrentCrewCredits >= 50000 && PLServer.Instance.CurrentCrewLevel >= 5)
+            {
+                CapBot.MyBot.AI_TargetPos = new Vector3(62, 18, -56);
+                CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                PLBurrowArena arena = Object.FindObjectOfType(typeof(PLBurrowArena)) as PLBurrowArena;
+                if (arena != null)
+                {
+                    if (CapBot.GetPawn().SpawnedInArena)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(103, 4, -115);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        CapBot.MyBot.EnablePathing = true;
+                    }
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "PLGame")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4 && !CapBot.GetPawn().SpawnedInArena)
+                    {
+                        CapBot.MyBot.EnablePathing = true;
+                    }
+                    else if (!arena.ArenaIsActive)
+                    {
+                        arena.StartArena(0);
+                        CapBot.GetPawn().transform.position = new Vector3(103, 4, -115);
+                    }
+                    else if (arena.ArenaIsActive && CapBot.GetPawn().SpawnedInArena)
+                    {
+                        CapBot.ActiveMainPriority = new AIPriority(AIPriorityType.E_MAIN, 2, 1);
+                        CapBot.MyBot.TickFindInvaderAction(null);
+                    }
+                }
+            }
+        }
+        static void AtRaces(PLPlayer CapBot, ref float LastAction) 
+        {
+            PLRace race = (Object.FindObjectOfType(typeof(PLRaceStartScreen)) as PLRaceStartScreen).MyRace;
+            PLPickupComponent prize = Object.FindObjectOfType(typeof(PLPickupComponent)) as PLPickupComponent;
+            if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR && race != null)
+            {
+                if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 1) == 0)
+                {
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "GarageBSO")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if (!PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.HasActiveMissionWithID(43072) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(174, 4, -332);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(43499))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                {
+                                    43499,
+                                    false
+                                });
+                            }
+                            else if (!PLServer.Instance.HasActiveMissionWithID(43072) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                {
+                                    43072,
+                                    false
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(158, 4, -341);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
 
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            race.SetAsReadyToStart();
+                        }
+                    }
+                    LastAction = Time.time;
+                    return;
+                }
+                else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 1) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.GetMissionWithID(43499).Ended) || (PLServer.Instance.HasActiveMissionWithID(43072) && !PLServer.Instance.GetMissionWithID(43072).Ended)))
+                {
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "GarageBSO")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if ((PLServer.Instance.HasActiveMissionWithID(43499) && !PLServer.Instance.GetMissionWithID(43499).Ended) || (PLServer.Instance.HasActiveMissionWithID(43072) && !PLServer.Instance.GetMissionWithID(43072).Ended))
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(174, 4, -332);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            if (PLServer.Instance.HasActiveMissionWithID(43499))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                {
+                                    43499
+                                });
+                                PLServer.Instance.CurrentCrewCredits += 15000;
+                            }
+                            else if (PLServer.Instance.HasActiveMissionWithID(43072))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                {
+                                    43072
+                                });
+                                PLServer.Instance.CurrentCrewCredits += 3000;
+                            }
+                        }
+                    }
+                    else if (prize != null && !prize.PickedUp)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(162, 6, -335);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            CapBot.AttemptToPickupComponentAtID(prize.PickupID);
+                        }
+                    }
+                    LastAction = Time.time;
+                    return;
+                }
+            }
+            else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_2 && race != null)
+            {
+                if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 2) == 0)
+                {
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "GarageBSO")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if (!PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.HasActiveMissionWithID(43938) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(123, -15, -345);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(43938))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                {
+                                    43938,
+                                    false
+                                });
+                            }
+                            else if (!PLServer.Instance.HasActiveMissionWithID(43932) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                {
+                                    43932,
+                                    false
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(132, -15, -278);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            race.SetAsReadyToStart();
+                        }
+                    }
+                    LastAction = Time.time;
+                    return;
+                }
+                else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 2) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.GetMissionWithID(43932).Ended) || (PLServer.Instance.HasActiveMissionWithID(43938) && !PLServer.Instance.GetMissionWithID(43938).Ended)))
+                {
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "GarageBSO")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if ((PLServer.Instance.HasActiveMissionWithID(43938) && !PLServer.Instance.GetMissionWithID(43938).Ended) || (PLServer.Instance.HasActiveMissionWithID(43932) && !PLServer.Instance.GetMissionWithID(43932).Ended))
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(123, -15, -345);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            if (PLServer.Instance.HasActiveMissionWithID(43932))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                {
+                                    43932
+                                });
+                                PLServer.Instance.CurrentCrewCredits += 3000;
+                            }
+                            else if (PLServer.Instance.HasActiveMissionWithID(43938))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                {
+                                    43938
+                                });
+                                PLServer.Instance.CurrentCrewCredits += 15000;
+                            }
+                        }
+                    }
+                    else if (prize != null && !prize.PickedUp)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(129, -14, -270);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            CapBot.AttemptToPickupComponentAtID(prize.PickupID);
+                        }
+                    }
+                    LastAction = Time.time;
+                    return;
+                }
+            }
+            else if (PLServer.GetCurrentSector().VisualIndication == ESectorVisualIndication.RACING_SECTOR_3 && race != null && (PLServer.Instance.RacesWonBitfield & 1) != 0 && (PLServer.Instance.RacesWonBitfield & 2) != 0)
+            {
+                if (!race.ReadyToStart && (PLServer.Instance.RacesWonBitfield & 4) == 0)
+                {
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "GarageBSO")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if (!PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.HasActiveMissionWithID(44088) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(115, -7, -233);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            if (PLServer.Instance.CurrentCrewCredits >= 5000 && !PLServer.Instance.HasActiveMissionWithID(44088))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                {
+                                    44088,
+                                    false
+                                });
+                            }
+                            else if (!PLServer.Instance.HasActiveMissionWithID(44085) && PLServer.Instance.CurrentCrewCredits >= 1000)
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                                {
+                                    44085,
+                                    false
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(106, -7, -234);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            race.SetAsReadyToStart();
+                        }
+                    }
+                    LastAction = Time.time;
+                    return;
+                }
+                else if (race.RaceEnded && (PLServer.Instance.RacesWonBitfield & 4) != 0 && ((prize != null && !prize.PickedUp) || (PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended)))
+                {
+                    foreach (PLTeleportationLocationInstance teleport in Object.FindObjectsOfType(typeof(PLTeleportationLocationInstance)))
+                    {
+                        if (teleport.name == "GarageBSO")
+                        {
+                            CapBot.MyBot.AI_TargetTLI = teleport;
+                            break;
+                        }
+                    }
+                    if ((PLServer.Instance.HasActiveMissionWithID(44085) && !PLServer.Instance.GetMissionWithID(44085).Ended) || (PLServer.Instance.HasActiveMissionWithID(44088) && !PLServer.Instance.GetMissionWithID(44088).Ended))
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(115, -7, -233);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            if (PLServer.Instance.HasActiveMissionWithID(44085))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                {
+                                    44085
+                                });
+                                PLServer.Instance.CurrentCrewCredits += 15000;
+                            }
+                            else if (PLServer.Instance.HasActiveMissionWithID(44088))
+                            {
+                                PLServer.Instance.photonView.RPC("AttemptForceEndMissionOfTypeID", PhotonTargets.All, new object[]
+                                {
+                                    44088
+                                });
+                                PLServer.Instance.CurrentCrewCredits += 30000;
+                            }
+                        }
+                    }
+                    else if (prize != null && !prize.PickedUp)
+                    {
+                        CapBot.MyBot.AI_TargetPos = new Vector3(110, -6, -226);
+                        CapBot.MyBot.AI_TargetPos_Raw = CapBot.MyBot.AI_TargetPos;
+                        if ((CapBot.MyBot.AI_TargetPos - CapBot.GetPawn().transform.position).sqrMagnitude > 4)
+                        {
+                            CapBot.MyBot.EnablePathing = true;
+                        }
+                        else
+                        {
+                            CapBot.AttemptToPickupComponentAtID(prize.PickupID);
+                        }
+                    }
+                    LastAction = Time.time;
+                    return;
+                }
+            }
+        }
         static void SetNextDestiny()
         {
             if (PLEncounterManager.Instance.PlayerShip == null) return;
@@ -2105,16 +2159,16 @@ namespace CapBot
         public static bool crewisbot = false;
         static void Postfix()
         {
-            if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null && delay > 3f && PhotonNetwork.isMasterClient)
+            if (PLEncounterManager.Instance.PlayerShip != null && PLServer.Instance.GetCachedFriendlyPlayerOfClass(0, PLEncounterManager.Instance.PlayerShip) == null && delay > 5f && PhotonNetwork.isMasterClient && !capisbot)
             {
+                capisbot = true;
                 PLServer.Instance.ServerAddCrewBotPlayer(0);
                 PLServer.Instance.GameHasStarted = true;
                 PLServer.Instance.CrewPurchaseLimitsEnabled = false;
                 PLGlobal.Instance.LoadedAIData = PLGlobal.Instance.GenerateDefaultPriorities();
-                capisbot = true;
                 PLServer.Instance.SetCustomCaptainOrderText(0, "Use the WarpGate!", false);
                 PLServer.Instance.SetCustomCaptainOrderText(1, "Engage Repair Protocols!", false);
-                PLServer.Instance.SetCustomCaptainOrderText(2, "Align the ship!", false);
+                PLServer.Instance.SetCustomCaptainOrderText(2, "Align and Jump!", false);
                 PLServer.Instance.SetCustomCaptainOrderText(3, "Collect Missions!", false);
                 PLServer.Instance.SetCustomCaptainOrderText(4, "Explore Planet!", false);
                 PLServer.Instance.SetCustomCaptainOrderText(5, "Complete Mission!", false);
@@ -2155,5 +2209,19 @@ namespace CapBot
             SpawnBot.crewisbot = false;
         }
     }
-
+    [HarmonyPatch(typeof(PLTabMenu), "BeginDrag_SCD")]
+    class DragComp
+    {
+        static void Postfix(PLTabMenu __instance, PLTabMenu.ShipComponentDisplay inSCD)
+        {
+            if (inSCD == null || inSCD.Component == null)
+            {
+                return;
+            }
+            if (PLNetworkManager.Instance.LocalPlayer != null && PhotonNetwork.isMasterClient && !inSCD.Component.Slot.Locked && SpawnBot.capisbot)
+            {
+                PLDraggedShipCompUI.Instance.DraggedComponent = inSCD.Component;
+            }
+        }
+    }
 }
