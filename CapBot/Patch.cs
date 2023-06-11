@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Linq;
 using Steamworks;
+using Unity.Jobs;
 
 //Fix visit planet and complete missions warnings
 //Fix Boarding command and action
@@ -1108,6 +1109,7 @@ namespace CapBot
         {
             PLBot AI = CapBot.MyBot;
             PLPawn pawn = CapBot.GetPawn();
+            PLLockedSeamlessDoor EntranceDoor = null;
             PLQuarantineDoor FirstDoor = null;
             PLQuarantineDoor SlimeDoors = null;
             PLRobotWalkerLarge paladin = null;
@@ -1136,6 +1138,14 @@ namespace CapBot
                     break;
                 }
             }
+            foreach (PLLockedSeamlessDoor teleport in Object.FindObjectsOfType(typeof(PLLockedSeamlessDoor)))
+            {
+                if (teleport.name == "Automated_Doors3 (1)")
+                {
+                    EntranceDoor = teleport;
+                    break;
+                }
+            }
             foreach (PLRobotWalkerLarge teleport in Object.FindObjectsOfType(typeof(PLRobotWalkerLarge)))
             {
                 if (teleport.name.Contains("Clone"))
@@ -1155,10 +1165,10 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null)
+                if (positions != null && Time.time - lastChange > 60)
                 {
                     List<GameObject> keycards = new List<GameObject>();
-                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>())
+                    foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
@@ -1178,10 +1188,14 @@ namespace CapBot
                     }
                 }
             }
-            else if (FirstDoor != null && !FirstDoor.IsDoorOpen)//Step 2: Open the first containment door 
+            else if (FirstDoor != null && !FirstDoor.IsDoorOpen)//Step 2: Open the first containment door and entrance door
             {
                 AI.AI_TargetPos = new Vector3(58, -103, -97);
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                if((pawn.transform.position - AI.AI_TargetPos).magnitude < 8f && !EntranceDoor.IsOpen()) 
+                {
+                    EntranceDoor.OpenDoor();
+                }
             }
             else if (SlimeDoors != null && !SlimeDoors.IsDoorOpen)//Step 3: Kill Experiment 72 
             {
@@ -2238,7 +2252,7 @@ namespace CapBot
             __instance.ButtonsActiveTypes.Clear();
             if (__instance.MyPlayer == null)
             {
-                if (PLNetworkManager.Instance.LocalPlayer != null && PhotonNetwork.isMasterClient && SpawnBot.capisbot)
+                if (PLNetworkManager.Instance.LocalPlayer != null && ((PhotonNetwork.isMasterClient && SpawnBot.capisbot) || PLNetworkManager.Instance.LocalPlayer.GetClassID() == 0))
                 {
                     if (PLServer.Instance.GetCachedFriendlyPlayerOfClass(1) == null)
                     {
@@ -2260,7 +2274,7 @@ namespace CapBot
             }
             else
             {
-                if (__instance.MyPlayer.IsBot && PLNetworkManager.Instance.LocalPlayer != null && PhotonNetwork.isMasterClient && SpawnBot.capisbot && __instance.MyPlayer.GetClassID() != 0)
+                if (__instance.MyPlayer.IsBot && PLNetworkManager.Instance.LocalPlayer != null && ((PhotonNetwork.isMasterClient && SpawnBot.capisbot) || PLNetworkManager.Instance.LocalPlayer.GetClassID() == 0) && __instance.MyPlayer.GetClassID() != 0)
                 {
                     __instance.ButtonsActiveTypes.Add(PLOverviewPlayerInfoDisplay.EPlayerButtonType.E_REMOVE_BOT);
                 }
@@ -2272,7 +2286,7 @@ namespace CapBot
                 {
                     __instance.ButtonsActiveTypes.Add(PLOverviewPlayerInfoDisplay.EPlayerButtonType.E_MUTE);
                 }
-                if (!__instance.MyPlayer.IsBot && PLNetworkManager.Instance.LocalPlayer != null && PhotonNetwork.isMasterClient && SpawnBot.capisbot && __instance.MyPlayer.GetPhotonPlayer() != null && __instance.MyPlayer.GetClassID() != 0 && !__instance.MyPlayer.GetPhotonPlayer().isMasterClient)
+                if (!__instance.MyPlayer.IsBot && PLNetworkManager.Instance.LocalPlayer != null && ((PhotonNetwork.isMasterClient && SpawnBot.capisbot) || PLNetworkManager.Instance.LocalPlayer.GetClassID() == 0) && __instance.MyPlayer.GetPhotonPlayer() != null && __instance.MyPlayer.GetClassID() != 0 && !__instance.MyPlayer.GetPhotonPlayer().isMasterClient)
                 {
                     __instance.ButtonsActiveTypes.Add(PLOverviewPlayerInfoDisplay.EPlayerButtonType.E_KICK);
                 }
