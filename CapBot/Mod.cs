@@ -4,7 +4,7 @@ namespace CapBot
 {
     public class Mod : PulsarMod
     {
-        public override string Version => "Alpha 1";
+        public override string Version => "Alpha 1.1";
 
         public override string Author => "pokegustavo";
 
