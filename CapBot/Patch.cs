@@ -1259,7 +1259,7 @@ namespace CapBot
                     }
                 }
             }
-            else if (FirstDoor != null && !FirstDoor.IsDoorOpen && pawn.transform.position.z > -140 && pawn.transform.position.y >= -102)//Step 2: Open the first containment door and entrance door
+            else if (FirstDoor != null && !FirstDoor.IsDoorOpen && pawn.transform.position.z > -140 && pawn.transform.position.y >= -104)//Step 2: Open the first containment door and entrance door
             {
                 AI.AI_TargetPos = new Vector3(58, -103, -111);
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
@@ -1278,7 +1278,7 @@ namespace CapBot
                 }
                 else if(pawn.transform.position.y < -105 && pawn.transform.position.z > -232) 
                 {
-                    AI.AI_TargetPos = new Vector3(52.2f, -121.5f, -198.2f);
+                    AI.AI_TargetPos = new Vector3(50.5f, -151.3f, -195.1f);
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                 }
                 else if(pawn.transform.position.y < -105) 
@@ -2055,6 +2055,8 @@ namespace CapBot
             List<PLSectorInfo> destines = new List<PLSectorInfo>();
             List<PLSectorInfo> priorityDestines = new List<PLSectorInfo>();
             PLSectorInfo GWG = PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.GWG);
+            PLSectorInfo Cornelia = PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.CORNELIA_HUB);
+            PLSectorInfo WDHub = PLGlobal.Instance.Galaxy.GetSectorOfVisualIndication(ESectorVisualIndication.WD_START);
             float nearestWarpGatedist = 500;
             PLSectorInfo nearestWarpGate = null;
             PLSectorInfo nearestWarpGatetoDest = null;
@@ -2129,6 +2131,23 @@ namespace CapBot
                                 if (mission.Objectives[0].IsCompleted)
                                 {
                                     destines.Add(PLGlobal.Instance.Galaxy.AllSectorInfos[0]);
+                                }
+                                break;
+                            case 45420:
+                                priorityDestines.Add(Cornelia);
+                                break;
+                            case 81262:
+                            case 24213:
+                            case 24214:
+                                if (mission.Objectives[0].IsCompleted)
+                                {
+                                    destines.Add(Cornelia);
+                                }
+                                break;
+                            case 25249:
+                                if (mission.Objectives[0].IsCompleted)
+                                {
+                                    destines.Add(WDHub);
                                 }
                                 break;
                         }
