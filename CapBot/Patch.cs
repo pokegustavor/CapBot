@@ -943,7 +943,6 @@ namespace CapBot
                     targets.Remove(targets[0]);
                     if (targets.Count > 0)
                     {
-                        PulsarModLoader.Utilities.Messaging.Notification("Next Pos, remaining " + targets.Count);
                         AI.AI_TargetPos = targets[0];
                         AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                         targetPos = AI.AI_TargetPos;
@@ -992,7 +991,6 @@ namespace CapBot
                     targets.Remove(targets[0]);
                     if (targets.Count > 0)
                     {
-                        PulsarModLoader.Utilities.Messaging.Notification("Next Pos, remaining " + targets.Count);
                         AI.AI_TargetPos = targets[0];
                         AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                         targetPos = AI.AI_TargetPos;
@@ -1215,19 +1213,34 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null && (Time.time - LastDestiny > 60 || targetPos == Vector3.zero))
+                if(targets.Count == 0 && positions != null) 
                 {
                     List<GameObject> keycards = new List<GameObject>();
                     foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
-                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    while(keycards.Count > 0) 
+                    {
+                        GameObject obj = keycards[Random.Range(0, keycards.Count - 1)];
+                        keycards.Remove(obj);
+                        targets.Add(obj.transform.position);
+                    }
+                    AI.AI_TargetPos = targets[0];
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                     targetPos = AI.AI_TargetPos;
-                    LastDestiny = Time.time;
                 }
-                else if(targetPos != Vector3.zero) 
+                if ((targetPos - pawn.transform.position).magnitude <= 3f)
+                {
+                    targets.Remove(targets[0]);
+                    if (targets.Count > 0)
+                    {
+                        AI.AI_TargetPos = targets[0];
+                        AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                        targetPos = AI.AI_TargetPos;
+                    }
+                }
+                else
                 {
                     AI.AI_TargetPos = targetPos;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
@@ -1242,6 +1255,7 @@ namespace CapBot
                             });
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                        targets.Clear();
                     }
                 }
             }
@@ -1289,20 +1303,34 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null && Time.time - LastDestiny > 60)
+                if (targets.Count == 0 && positions != null)
                 {
-
                     List<GameObject> keycards = new List<GameObject>();
                     foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
-                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    while (keycards.Count > 0)
+                    {
+                        GameObject obj = keycards[Random.Range(0, keycards.Count - 1)];
+                        keycards.Remove(obj);
+                        targets.Add(obj.transform.position);
+                    }
+                    AI.AI_TargetPos = targets[0];
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                     targetPos = AI.AI_TargetPos;
-                    LastDestiny = Time.time;
                 }
-                else if (targetPos != Vector3.zero)
+                if ((targetPos - pawn.transform.position).magnitude <= 3f)
+                {
+                    targets.Remove(targets[0]);
+                    if (targets.Count > 0)
+                    {
+                        AI.AI_TargetPos = targets[0];
+                        AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                        targetPos = AI.AI_TargetPos;
+                    }
+                }
+                else
                 {
                     AI.AI_TargetPos = targetPos;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
@@ -1317,6 +1345,7 @@ namespace CapBot
                             });
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                        targets.Clear();
                     }
                 }
             }
@@ -1350,19 +1379,34 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null && Time.time - LastDestiny > 60)
+                if (targets.Count == 0 && positions != null)
                 {
                     List<GameObject> keycards = new List<GameObject>();
                     foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
-                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    while (keycards.Count > 0)
+                    {
+                        GameObject obj = keycards[Random.Range(0, keycards.Count - 1)];
+                        keycards.Remove(obj);
+                        targets.Add(obj.transform.position);
+                    }
+                    AI.AI_TargetPos = targets[0];
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                     targetPos = AI.AI_TargetPos;
-                    LastDestiny = Time.time;
                 }
-                else if (targetPos != Vector3.zero)
+                if ((targetPos - pawn.transform.position).magnitude <= 3f)
+                {
+                    targets.Remove(targets[0]);
+                    if (targets.Count > 0)
+                    {
+                        AI.AI_TargetPos = targets[0];
+                        AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                        targetPos = AI.AI_TargetPos;
+                    }
+                }
+                else
                 {
                     AI.AI_TargetPos = targetPos;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
@@ -1377,6 +1421,7 @@ namespace CapBot
                             });
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                        targets.Clear();
                     }
                 }
             }
@@ -1397,19 +1442,34 @@ namespace CapBot
                         break;
                     }
                 }
-                if (positions != null && Time.time - LastDestiny > 60)
+                if (targets.Count == 0 && positions != null)
                 {
                     List<GameObject> keycards = new List<GameObject>();
                     foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
-                    AI.AI_TargetPos = keycards[Random.Range(0, keycards.Count - 1)].transform.position;
+                    while (keycards.Count > 0)
+                    {
+                        GameObject obj = keycards[Random.Range(0, keycards.Count - 1)];
+                        keycards.Remove(obj);
+                        targets.Add(obj.transform.position);
+                    }
+                    AI.AI_TargetPos = targets[0];
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                     targetPos = AI.AI_TargetPos;
-                    LastDestiny = Time.time;
                 }
-                else if (targetPos != Vector3.zero)
+                if ((targetPos - pawn.transform.position).magnitude <= 3f)
+                {
+                    targets.Remove(targets[0]);
+                    if (targets.Count > 0)
+                    {
+                        AI.AI_TargetPos = targets[0];
+                        AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                        targetPos = AI.AI_TargetPos;
+                    }
+                }
+                else
                 {
                     AI.AI_TargetPos = targetPos;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
@@ -1424,6 +1484,7 @@ namespace CapBot
                             });
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
+                        targets.Clear();
                     }
                 }
             }
@@ -1513,7 +1574,7 @@ namespace CapBot
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                 foreach (PLPickupComponent component in Object.FindObjectsOfType(typeof(PLPickupComponent)))
                 {
-                    if ((pawn.transform.position - component.transform.position).magnitude < 8f)
+                    if ((pawn.transform.position - component.transform.position).magnitude < 8f && !component.PickedUp)
                     {
                         CapBot.photonView.RPC("AttemptToPickupComponentAtID", PhotonTargets.MasterClient, new object[]
                             {
