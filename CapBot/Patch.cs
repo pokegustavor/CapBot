@@ -46,7 +46,7 @@ namespace CapBot
                 __instance.RaceID = 2;
             }
             bool HasIntruders = false;
-            if(__instance.GetPawn().MyController.AI_Item_Target == __instance.GetPawn().transform) __instance.GetPawn().MyController.PreAIPriorityTick();
+            if (__instance.GetPawn().MyController.AI_Item_Target == __instance.GetPawn().transform) __instance.GetPawn().MyController.PreAIPriorityTick();
             if (__instance.GetPhotonPlayer() == null && PLNetworkManager.Instance.LocalPlayer != null) __instance.PhotonPlayer = PLNetworkManager.Instance.LocalPlayer.GetPhotonPlayer();
             if (__instance.StartingShip != null && !__instance.StartingShip.InWarp) //Check for intruders and set hostile ships
             {
@@ -169,7 +169,7 @@ namespace CapBot
                         allNPC.Add(pLDialogueActorInstance);
                     }
                 }
-                if (allNPC.Count > 0) //if there is at least 1 mission to gather or deliver
+                if (allNPC.Count > 0 && __instance.StartingShip != null && !__instance.StartingShip.InWarp) //if there is at least 1 mission to gather or deliver
                 {
                     if (PLServer.Instance.CaptainsOrdersID != 11 && Time.time - LastOrder > 1f)
                     {
@@ -914,7 +914,7 @@ namespace CapBot
             PLContainmentSystem colonyDoor = Object.FindObjectOfType(typeof(PLContainmentSystem)) as PLContainmentSystem;
             if (!PLServer.AnyPlayerHasItemOfName("Facility Keycard")) //Step 1: Find facility key
             {
-                if(targets.Count == 0) 
+                if (targets.Count == 0)
                 {
                     possibleTargets = new List<Vector3>()
                     {
@@ -928,7 +928,7 @@ namespace CapBot
                         new Vector3(1001,-515,443),
                         new Vector3(988,-517,494),
                     };
-                    while(possibleTargets.Count > 0) 
+                    while (possibleTargets.Count > 0)
                     {
                         Vector3 pos = possibleTargets[Random.Range(0, possibleTargets.Count - 1)];
                         possibleTargets.Remove(pos);
@@ -938,7 +938,7 @@ namespace CapBot
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                     targetPos = AI.AI_TargetPos;
                 }
-                if((targetPos - pawn.transform.position).magnitude <= 3f) 
+                if ((targetPos - pawn.transform.position).magnitude <= 3f)
                 {
                     targets.Remove(targets[0]);
                     if (targets.Count > 0)
@@ -948,7 +948,7 @@ namespace CapBot
                         targetPos = AI.AI_TargetPos;
                     }
                 }
-                else 
+                else
                 {
                     AI.AI_TargetPos = targetPos;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
@@ -1204,6 +1204,14 @@ namespace CapBot
             }
             if (!PLServer.AnyPlayerHasItemOfName("Entrance Security Keycard")) //Step 1: Find keycard
             {
+                if (!PLServer.Instance.HasMissionWithID(54236)) 
+                {
+                    PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
+                        {
+                        54236,
+                        false
+                        });
+                }
                 PLRandomChildItem positions = null;
                 foreach (PLRandomChildItem teleport in Object.FindObjectsOfType<PLRandomChildItem>(true))
                 {
@@ -1213,14 +1221,14 @@ namespace CapBot
                         break;
                     }
                 }
-                if(targets.Count == 0 && positions != null) 
+                if (targets.Count == 0 && positions != null)
                 {
                     List<GameObject> keycards = new List<GameObject>();
                     foreach (PLPickupObject item in positions.gameObject.GetComponentsInChildren<PLPickupObject>(true))
                     {
                         keycards.Add(item.gameObject);
                     }
-                    while(keycards.Count > 0) 
+                    while (keycards.Count > 0)
                     {
                         GameObject obj = keycards[Random.Range(0, keycards.Count - 1)];
                         keycards.Remove(obj);
@@ -1256,14 +1264,16 @@ namespace CapBot
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
                         targets.Clear();
+                        PulsarModLoader.Utilities.Messaging.ChatMessage(PhotonTargets.All, "Got the " + inObj.GetItemName(), CapBot.GetPlayerID());
                     }
                 }
             }
             else if (FirstDoor != null && !FirstDoor.IsDoorOpen && pawn.transform.position.z > -140 && pawn.transform.position.y >= -104)//Step 2: Open the first containment door and entrance door
             {
+                if (targets.Count > 0) targets.Clear();
                 AI.AI_TargetPos = new Vector3(58, -103, -111);
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
-                if((pawn.transform.position - EntranceDoor.transform.position).magnitude < 8f && !EntranceDoor.IsOpen()) 
+                if ((pawn.transform.position - EntranceDoor.transform.position).magnitude < 8f && !EntranceDoor.IsOpen())
                 {
                     EntranceDoor.OpenDoor();
                 }
@@ -1272,23 +1282,42 @@ namespace CapBot
             {
                 if (pawn.transform.position.y < -120)
                 {
+                    if (targets.Count > 0) targets.Clear();
                     if (pawn.Health / pawn.MaxHealth > 0.25f) AI.AI_TargetPos = new Vector3(59, -141, -184);
                     else AI.AI_TargetPos = new Vector3(60, -151, -186);
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    if(PLInGameUI.Instance.BossUI_Target != null) AI.HighPriorityTarget = PLInGameUI.Instance.BossUI_Target;
+                    CapBot.MyBot.TickFindInvaderAction(null);
                 }
-                else if(pawn.transform.position.y < -105 && pawn.transform.position.z > -232) 
+                else if (targets.Count == 0)
                 {
-                    AI.AI_TargetPos = new Vector3(50.5f, -151.3f, -195.1f);
+                    targets.AddRange(new Vector3[]
+                    {
+                        new Vector3(58.3f, -103f, -193.3f),
+                        new Vector3(43.8f, -115.1f, -239.7f),
+                        new Vector3(58f, -119f, -231f),
+                        new Vector3(54.7f, -119f, -220f),
+                        new Vector3(53.3f, -118.8f, -212f),
+                        new Vector3(51.9f, -118.7f, -202.1f),
+                        new Vector3(50.5f, -151.3f, -195.1f)
+                    });
+                    AI.AI_TargetPos = targets[0];
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    targetPos = AI.AI_TargetPos;
                 }
-                else if(pawn.transform.position.y < -105) 
+                else if ((targetPos - pawn.transform.position).magnitude <= 2f)
                 {
-                    AI.AI_TargetPos = new Vector3(58f, -119f, -231f);
-                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    targets.Remove(targets[0]);
+                    if (targets.Count > 0)
+                    {
+                        AI.AI_TargetPos = targets[0];
+                        AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                        targetPos = AI.AI_TargetPos;
+                    }
                 }
-                else 
+                else
                 {
-                    AI.AI_TargetPos = new Vector3(47f, -111f, -248f);
+                    AI.AI_TargetPos = targetPos;
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                 }
             }
@@ -1346,14 +1375,40 @@ namespace CapBot
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
                         targets.Clear();
+                        PulsarModLoader.Utilities.Messaging.ChatMessage(PhotonTargets.All, "Got the " + inObj.GetItemName(), CapBot.GetPlayerID());
                     }
                 }
             }
             else if (!PLServer.Instance.HasMissionWithID(55400))//Step 5: Get kill Stalker Mission 
             {
-
-                AI.AI_TargetPos = new Vector3(-12, -151, -176);
-                AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                if (targets.Count == 0)
+                {
+                    targets.AddRange(new Vector3[]
+                    {
+                        new Vector3(33.6f, -151.3f, -144f),
+                        new Vector3(9.1f, -151.8f, -140.2f),
+                        new Vector3(-12.3f, -151.8f, -160f),
+                        new Vector3(-11.9f, -151.8f, -176.2f),
+                    });
+                    AI.AI_TargetPos = targets[0];
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    targetPos = AI.AI_TargetPos;
+                }
+                else if ((targetPos - pawn.transform.position).magnitude <= 2f)
+                {
+                    targets.Remove(targets[0]);
+                    if (targets.Count > 0)
+                    {
+                        AI.AI_TargetPos = targets[0];
+                        AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                        targetPos = AI.AI_TargetPos;
+                    }
+                }
+                else
+                {
+                    AI.AI_TargetPos = targetPos;
+                    AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                }
                 if ((pawn.transform.position - AI.AI_TargetPos).magnitude < 6f)
                 {
                     PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
@@ -1365,8 +1420,10 @@ namespace CapBot
             }
             else if (!PLServer.Instance.HasCompletedMissionWithID(55400))//Step 6: Kill Stalker 
             {
+                if (targets.Count > 0) targets.Clear();
                 AI.AI_TargetPos = new Vector3(23, -233, -88);
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                CapBot.MyBot.TickFindInvaderAction(null);
             }
             else if (!PLServer.AnyPlayerHasItemOfName("Level 2 Admin Access Card"))//Step 7: Find keycard 2
             {
@@ -1422,14 +1479,17 @@ namespace CapBot
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
                         targets.Clear();
+                        PulsarModLoader.Utilities.Messaging.ChatMessage(PhotonTargets.All, "Got the " + inObj.GetItemName(), CapBot.GetPlayerID());
                     }
                 }
             }
             else if (paladin != null) //Step 8: Kill Elite Paladin
             {
+                if (targets.Count > 0) targets.Clear();
                 AI.HighPriorityTarget = paladin;
                 AI.AI_TargetPos = new Vector3(21, -227, 394);
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                CapBot.MyBot.TickFindInvaderAction(null);
             }
             else if (!PLServer.AnyPlayerHasItemOfName("Level 3 Admin Access Card")) //Step 9: Find level 3 keycard 
             {
@@ -1485,11 +1545,13 @@ namespace CapBot
                         CapBot.GetPawn().photonView.RPC("Anim_Pickup", PhotonTargets.Others, new object[0]);
                         PLMusic.PostEvent("play_sx_player_item_pickup", CapBot.GetPawn().gameObject);
                         targets.Clear();
+                        PulsarModLoader.Utilities.Messaging.ChatMessage(PhotonTargets.All, "Got the " + inObj.GetItemName(), CapBot.GetPlayerID());
                     }
                 }
             }
             else if (!PLServer.Instance.HasMissionWithID(55401) || !PLServer.Instance.HasMissionWithID(55402)) //Step 10: Get kill Scientist and get medicine Missions 
             {
+                if (targets.Count > 0) targets.Clear();
                 if (!PLServer.Instance.HasActiveMissionWithID(55401))
                 {
                     AI.AI_TargetPos = new Vector3(-12, -151, 463);
@@ -1499,6 +1561,7 @@ namespace CapBot
                     AI.AI_TargetPos = new Vector3(-13, -151, 479);
                 }
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                CapBot.MyBot.TickFindInvaderAction(null);
                 if ((pawn.transform.position - new Vector3(-12, -151, 463)).magnitude < 6f && !PLServer.Instance.HasActiveMissionWithID(55401))
                 {
                     PLServer.Instance.photonView.RPC("AttemptStartMissionOfTypeID", PhotonTargets.MasterClient, new object[]
@@ -1537,6 +1600,7 @@ namespace CapBot
                         }
                     }
                     AI.AI_TargetPos_Raw = AI.AI_TargetPos;
+                    CapBot.MyBot.TickFindInvaderAction(null);
                 }
             }
             else if (!PLServer.Instance.HasCompletedMissionWithID(55402)) //Step 12: Finish Medicine mission
@@ -1640,6 +1704,7 @@ namespace CapBot
                 }
                 AI.AI_TargetPos_Raw = AI.AI_TargetPos;
                 AI.HighPriorityTarget = PLInGameUI.Instance.BossUI_Target;
+                CapBot.MyBot.TickFindInvaderAction(null);
             }
         }
         static void Burrow(PLPlayer CapBot)
@@ -2344,13 +2409,13 @@ namespace CapBot
         }
     }
     [HarmonyPatch(typeof(PLBotController), "HandleMovement")]
-    class Rotation 
+    class Rotation
     {
-        static void Postfix(PLBotController __instance) 
+        static void Postfix(PLBotController __instance)
         {
-            if(__instance.Bot_TargetXRot == 0f) 
+            if (__instance.Bot_TargetXRot == 0f)
             {
-               __instance.Bot_TargetXRot = __instance.TargetRot.eulerAngles.x;
+                __instance.Bot_TargetXRot = __instance.TargetRot.eulerAngles.x;
                 __instance.StoredXRot = Mathf.LerpAngle(__instance.StoredXRot, __instance.Bot_TargetXRot, Time.deltaTime * 5f);
             }
         }
@@ -2429,9 +2494,9 @@ namespace CapBot
         }
     }
     [HarmonyPatch(typeof(PLOverviewPlayerInfoDisplay), "UpdateButtons")]
-    class AddBots 
+    class AddBots
     {
-        static void Postfix(PLOverviewPlayerInfoDisplay __instance) 
+        static void Postfix(PLOverviewPlayerInfoDisplay __instance)
         {
             __instance.ButtonsActiveTypes.Clear();
             if (__instance.MyPlayer == null)
@@ -2497,9 +2562,9 @@ namespace CapBot
         }
     }
     [HarmonyPatch(typeof(PLTabMenu), "LocalPlayerCanEditTalentsOfPlayer")]
-    class TalentsOfBots 
+    class TalentsOfBots
     {
-        static void Postfix(PLPlayer inPlayer, ref bool __result) 
+        static void Postfix(PLPlayer inPlayer, ref bool __result)
         {
             if (PLNetworkManager.Instance != null && inPlayer != null && PLNetworkManager.Instance.LocalPlayer != null)
             {
